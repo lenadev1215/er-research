@@ -11,7 +11,8 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "collect": "node scripts/collect.mts",
-    "load-meta": "node scripts/load-meta.mts"
+    "load-meta": "node scripts/load-meta.mts",
+    "snapshot": "node scripts/snapshot.mts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.5",

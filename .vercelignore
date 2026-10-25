@@ -1,0 +1,10 @@
+# Vercel CLI 업로드 제외 목록. 원본 DB(닉네임 포함), 키, 허가 전 팬킷 이미지는 올리지 않는다.
+.env*
+/data/*
+!/data/er-public.db
+/public/characters/*
+/.claude/
+/.vscode/
+/node_modules
+/.next
+CLAUDE.md
