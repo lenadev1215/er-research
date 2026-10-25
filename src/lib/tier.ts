@@ -24,10 +24,24 @@ const SHRINK_GAMES = 10;
 // 상위 누적 백분위 경계: S 10%, A 25%, B 50%, C 75%, 나머지 D
 const TIER_CUTOFFS: ReadonlyArray<[ Tier, number ]> = [ [ "S", 0.1 ], [ "A", 0.25 ], [ "B", 0.5 ], [ "C", 0.75 ] ];
 
+// 백분위는 상대 순위라 거의 모든 조합이 1~3판이면 그중에서 S가 나온다.
+// 종합 등급에 한해 판수가 적은 조합은 절대 기준으로 상한을 둔다.
+const LOW_SAMPLE_GAMES = 3;
+const LOW_SAMPLE_TIER_CAP: Tier = "B";
+
+const tierIndex = (tier: Tier) => TIERS.indexOf(tier);
+
+const capTier = (tier: Tier, games: number): Tier =>
+  games <= LOW_SAMPLE_GAMES && tierIndex(tier) < tierIndex(LOW_SAMPLE_TIER_CAP) ? LOW_SAMPLE_TIER_CAP : tier;
+
+// 등급 순서: 등급이 먼저, 같은 등급 안에서는 점수. 상한이 걸린 조합이 점수로 위 등급보다 앞서지 않게 한다.
+export const compareRank = (x: RankedCombo, y: RankedCombo) =>
+  tierIndex(x.tier) - tierIndex(y.tier) || y.score - x.score || y.games - x.games;
+
 export type RankedCombo = SynergyCombo & { score: number; tier: Tier };
 
 export type TierResult = {
-  ranked: RankedCombo[]; // 점수 내림차순
+  ranked: RankedCombo[]; // 등급 순, 같은 등급은 점수 내림차순
   byTier: Record<Tier, RankedCombo[]>;
   insufficient: SynergyCombo[];
 };
@@ -89,7 +103,11 @@ export function assignTiers(combos: SynergyCombo[], criterion: Criterion, minGam
   const ranked = eligible
     .map((c) => ({ ...c, score: score(c) }))
     .sort((x, y) => y.score - x.score || y.games - x.games)
-    .map((c, i, all) => ({ ...c, tier: tierAt(i, all.length) }));
+    .map((c, i, all) => {
+      const tier = tierAt(i, all.length);
+      return { ...c, tier: criterion === "overall" ? capTier(tier, c.games) : tier };
+    })
+    .sort(compareRank);
 
   const byTier = Object.fromEntries(TIERS.map((t) => [ t, ranked.filter((c) => c.tier === t) ])) as Record<Tier, RankedCombo[]>;
   return { ranked, byTier, insufficient };

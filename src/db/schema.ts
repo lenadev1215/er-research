@@ -29,6 +29,7 @@ export const participants = sqliteTable(
     coreTraitCode: integer("core_trait_code").notNull(), // API traitFirstCore
     mmrBefore: integer("mmr_before").notNull(), // 티어 구간 판별용
     mmrGain: integer("mmr_gain").notNull(), // RP 획득량
+    teamKill: integer("team_kill"), // API teamKill. 팀 단위 값이라 같은 팀은 모두 같다. 0003 이전 수집분은 채우기 전까지 null
     preMade: integer("pre_made").notNull(), // API preMade. 의미 확인 전까지 원본 값 보존
   },
   (t) => [

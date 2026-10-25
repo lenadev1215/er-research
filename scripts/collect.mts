@@ -5,16 +5,11 @@ import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { and, asc, between, eq, gte, isNull, sql } from "drizzle-orm";
 import { crawlUsers, games, participants } from "../src/db/schema.ts";
+import { callApi, fetchGame, type ApiBody, type GameRecord } from "./er-api.mts";
 
-process.loadEnvFile(".env.local");
-
-const API_BASE = "https://open-api.bser.io";
-const API_KEY = process.env.ER_API_KEY;
 const SEASON_ID = 41;
 const RANKED = 3;
 const SQUAD = 3;
-const REQUEST_INTERVAL_MS = 1100;
-const MAX_RETRIES = 5;
 
 // 다이아몬드 5000~6399 (시즌 41, 사용자 확인). 이 값 이상인 유저를 MMR 낮은 순으로 처리한다.
 const DIAMOND_MIN = 5000;
@@ -25,62 +20,10 @@ const targetGames = Number(process.argv[ 2 ] ?? 300);
 const maxHours = Number(process.argv[ 3 ] ?? Infinity);
 const deadline = Date.now() + maxHours * 3_600_000;
 
-if ( !API_KEY ) {
-  throw new Error("ER_API_KEY가 .env.local에 없습니다.");
-}
-
 const sqlite = new Database("./data/er.db");
 sqlite.pragma("journal_mode = WAL");
 sqlite.pragma("foreign_keys = ON");
 const db = drizzle(sqlite);
-
-type ApiBody = { code: number; message: string };
-
-type GameRecord = {
-  gameId: number;
-  nickname: string;
-  seasonId: number;
-  matchingMode: number;
-  matchingTeamMode: number;
-  versionMajor: number;
-  versionMinor: number;
-  startDtm: string;
-  mmrAvg: number;
-  teamNumber: number;
-  gameRank: number;
-  characterNum: number;
-  bestWeapon: number;
-  traitFirstCore: number;
-  mmrBefore: number;
-  mmrAfter: number;
-  mmrGain: number;
-  preMade: number;
-};
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// 모든 호출 뒤에 간격을 두고, 429는 지수 백오프로 재시도한다.
-// HTTP 200이어도 body code가 401/404일 수 있어 body 기준으로 판단한다.
-async function callApi<T extends ApiBody>(path: string): Promise<T | null> {
-  for ( let attempt = 0; attempt < MAX_RETRIES; attempt++ ) {
-    const res = await fetch(`${ API_BASE }${ path }`, { headers: { "x-api-key": API_KEY! } });
-    await sleep(REQUEST_INTERVAL_MS);
-
-    const body = (await res.json().catch(() => null)) as T | null;
-    const code = body?.code ?? res.status;
-
-    if ( code === 200 && body ) return body;
-    if ( code === 404 ) return null;
-    if ( code === 429 || res.status === 429 || res.status >= 500 ) {
-      const wait = 2 ** attempt * 2000;
-      console.warn(`  ${ code } 응답, ${ wait / 1000 }초 후 재시도: ${ path }`);
-      await sleep(wait);
-      continue;
-    }
-    throw new Error(`API 오류 ${ code } (${ body?.message ?? res.statusText }): ${ path }`);
-  }
-  throw new Error(`재시도 초과: ${ path }`);
-}
 
 const now = () => new Date().toISOString();
 
@@ -98,9 +41,6 @@ const enqueueParticipants = (records: GameRecord[]) =>
 
 const isTargetGame = (g: GameRecord) =>
   g.seasonId === SEASON_ID && g.matchingMode === RANKED && g.matchingTeamMode === SQUAD;
-
-const fetchGame = async (gameId: number) =>
-  (await callApi<ApiBody & { userGames: GameRecord[] }>(`/v1/games/${ gameId }`))?.userGames ?? [];
 
 const diamondQueueSize = () =>
   db.select({ n: sql<number>`count(*)` }).from(crawlUsers)
@@ -154,6 +94,7 @@ function saveGame(records: GameRecord[]) {
       coreTraitCode: r.traitFirstCore,
       mmrBefore: r.mmrBefore,
       mmrGain: r.mmrGain,
+      teamKill: r.teamKill,
       preMade: r.preMade,
     }))).run();
   });

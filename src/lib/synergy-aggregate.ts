@@ -9,6 +9,7 @@ export type AllyFilter = { characterCode: number; weaponCode: number | null };
 export type TeamRow = {
   gameRank: number;
   mmrGain: number; // 내 실험체의 RP 획득량
+  teamKill: number | null; // 팀 킬 수. 수집 시점에 따라 아직 없을 수 있다
   teamCount: number;
   mates: [ Pick, Pick ];
 };
@@ -21,6 +22,7 @@ export type Stats = {
   top3Rate: number;
   avgRp: number;
   avgRank: number;
+  avgTk: number | null; // TK가 있는 경기만으로 낸 평균. 하나도 없으면 null
   baselineWinRate: number; // 1 / 팀 수의 평균. 팀 수가 경기마다 달라 고정값을 쓰지 않는다
 };
 
@@ -55,9 +57,9 @@ export function remainingMates(mates: [ Pick, Pick ], allies: AllyFilter[]): Pic
   return fits ? [] : null;
 }
 
-type Acc = { games: number; wins: number; top3: number; rpSum: number; rankSum: number; baselineSum: number };
+type Acc = { games: number; wins: number; top3: number; rpSum: number; rankSum: number; tkGames: number; tkSum: number; baselineSum: number };
 
-const emptyAcc = (): Acc => ({ games: 0, wins: 0, top3: 0, rpSum: 0, rankSum: 0, baselineSum: 0 });
+const emptyAcc = (): Acc => ({ games: 0, wins: 0, top3: 0, rpSum: 0, rankSum: 0, tkGames: 0, tkSum: 0, baselineSum: 0 });
 
 function add(acc: Acc, row: TeamRow) {
   acc.games++;
@@ -65,6 +67,10 @@ function add(acc: Acc, row: TeamRow) {
   if ( row.gameRank <= 3 ) acc.top3++;
   acc.rpSum += row.mmrGain;
   acc.rankSum += row.gameRank;
+  if ( row.teamKill !== null ) {
+    acc.tkGames++;
+    acc.tkSum += row.teamKill;
+  }
   acc.baselineSum += 1 / row.teamCount;
 }
 
@@ -74,6 +80,7 @@ const toStats = (s: Acc): Stats => ({
   top3Rate: s.games ? s.top3 / s.games : 0,
   avgRp: s.games ? s.rpSum / s.games : 0,
   avgRank: s.games ? s.rankSum / s.games : 0,
+  avgTk: s.tkGames ? s.tkSum / s.tkGames : null,
   baselineWinRate: s.games ? s.baselineSum / s.games : 0,
 });
 

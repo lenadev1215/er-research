@@ -1,7 +1,7 @@
 "use client";
 
 import { useIncrementalList } from "@/hooks/use-incremental-list";
-import type { RankedCombo, Tier } from "@/lib/tier";
+import { compareRank, type RankedCombo, type Tier } from "@/lib/tier";
 import { useSynergyUi, type SortKey } from "@/stores/synergy-ui";
 import { percent, signedRp } from "./format";
 import { PickGroup } from "./pick-badge";
@@ -39,6 +39,7 @@ const COLUMNS: ReadonlyArray<{ key: SortKey; label: string; short: string; rende
   { key: "top3Rate", label: "TOP3율", short: "TOP3", render: (c) => percent(c.top3Rate) },
   { key: "avgRp", label: "평균 RP", short: "RP", render: (c) => signedRp(c.avgRp) },
   { key: "avgRank", label: "평균 순위", short: "순위", render: (c) => c.avgRank.toFixed(1) },
+  { key: "avgTk", label: "평균 TK", short: "TK", render: (c) => c.avgTk === null ? "-" : c.avgTk.toFixed(1) },
 ];
 const METRICS = COLUMNS.filter((col) => col.key !== "score");
 
@@ -60,9 +61,13 @@ export function ComboTable({ combos, groupLabel, showTier }: Props) {
   const setSortKey = useSynergyUi((s) => s.setSortKey);
 
   const columns = showTier ? COLUMNS : METRICS;
+  // TK가 아직 없는 조합(null)은 정렬 방향과 관계없이 맨 뒤로 보낸다.
   const sorted = [ ...combos ].sort((x, y) => {
-    const diff = x[ sort.key ] - y[ sort.key ];
-    return sort.dir === "asc" ? diff : -diff;
+    if ( sort.key === "score" ) return sort.dir === "desc" ? compareRank(x, y) : compareRank(y, x);
+    const a = x[ sort.key ];
+    const b = y[ sort.key ];
+    if ( a === null || b === null ) return a === b ? 0 : a === null ? 1 : -1;
+    return sort.dir === "asc" ? a - b : b - a;
   });
   // combos는 부모에서 메모해 둔 배열이라, 선택·기준·최소 판수가 바뀔 때만 참조가 바뀐다.
   const { visibleCount, hasMore, showMore, sentinelRef } = useIncrementalList(sorted.length, [ combos, sort.key, sort.dir ]);
@@ -141,7 +146,7 @@ export function ComboTable({ combos, groupLabel, showTier }: Props) {
             {showTier && <TierBadge tier={c.tier} tall />}
             <div className="flex min-w-0 flex-1 flex-col gap-2.5">
               <PickGroup mates={c.mates} variant="inline" />
-              <dl className="grid grid-cols-5 text-center">
+              <dl className="grid grid-cols-3 gap-y-2 text-center">
                 {METRICS.map((col) => (
                   <div key={col.key} className="flex flex-col gap-0.5">
                     <dt className="text-[11px] text-muted">{col.short}</dt>

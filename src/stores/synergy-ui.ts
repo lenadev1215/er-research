@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import type { Criterion } from "@/lib/tier";
 
-export type SortKey = "score" | "games" | "winRate" | "top3Rate" | "avgRp" | "avgRank";
+export type SortKey = "score" | "games" | "winRate" | "top3Rate" | "avgRp" | "avgRank" | "avgTk";
 export type SortDir = "asc" | "desc";
 
 // 평균 순위만 낮을수록 좋다.

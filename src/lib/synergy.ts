@@ -39,6 +39,7 @@ function fetchTeamRows({ characterCode, weaponCode, coreTraitCode }: SynergyQuer
     .select({
       gameRank: me.gameRank,
       mmrGain: me.mmrGain,
+      teamKill: me.teamKill,
       teamCount: games.teamCount,
       aCharacter: a.characterCode,
       aWeapon: a.weaponCode,
@@ -60,6 +61,7 @@ function fetchTeamRows({ characterCode, weaponCode, coreTraitCode }: SynergyQuer
   return rows.map((r) => ({
     gameRank: r.gameRank,
     mmrGain: r.mmrGain,
+    teamKill: r.teamKill,
     teamCount: r.teamCount,
     mates: [
       { characterCode: r.aCharacter, weaponCode: r.aWeapon },
