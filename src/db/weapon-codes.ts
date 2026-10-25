@@ -1,0 +1,28 @@
+// bestWeapon 숫자 코드 → 무기 종류. 공식 대응표가 없어 추정값이다 (docs/API_NOTES.md).
+// 수집 데이터의 실험체별 무기 분포로 검증하기 전까지 확정하지 않는다.
+export const WEAPON_CODES: ReadonlyArray<{ code: number; masteryType: string }> = [
+  { code: 1, masteryType: "Glove" },
+  { code: 2, masteryType: "Tonfa" },
+  { code: 3, masteryType: "Bat" },
+  { code: 4, masteryType: "Whip" },
+  { code: 5, masteryType: "HighAngleFire" },
+  { code: 6, masteryType: "DirectFire" },
+  { code: 7, masteryType: "Bow" },
+  { code: 8, masteryType: "CrossBow" },
+  { code: 9, masteryType: "Pistol" },
+  { code: 10, masteryType: "AssaultRifle" },
+  { code: 11, masteryType: "SniperRifle" },
+  { code: 13, masteryType: "Hammer" },
+  { code: 14, masteryType: "Axe" },
+  { code: 15, masteryType: "OneHandSword" },
+  { code: 16, masteryType: "TwoHandSword" },
+  { code: 17, masteryType: "Polearm" },
+  { code: 18, masteryType: "DualSword" },
+  { code: 19, masteryType: "Spear" },
+  { code: 20, masteryType: "Nunchaku" },
+  { code: 21, masteryType: "Rapier" },
+  { code: 22, masteryType: "Guitar" },
+  { code: 23, masteryType: "Camera" },
+  { code: 24, masteryType: "Arcana" },
+  { code: 25, masteryType: "VFArm" },
+];
