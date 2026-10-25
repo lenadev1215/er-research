@@ -63,8 +63,9 @@ export const crawlUsers = sqliteTable(
   {
     nickname: text("nickname").primaryKey(),
     userId: text("user_id"), // 조회 전에는 null
+    lastMmr: integer("last_mmr"), // 마지막으로 본 MMR. 수집 우선순위(낮은 구간부터)에 쓴다
     lastCrawledAt: text("last_crawled_at"), // null이면 아직 수집 전
     createdAt: text("created_at").notNull(),
   },
-  (t) => [ index("crawl_users_last_crawled_idx").on(t.lastCrawledAt) ],
+  (t) => [ index("crawl_users_queue_idx").on(t.lastCrawledAt, t.lastMmr) ],
 );

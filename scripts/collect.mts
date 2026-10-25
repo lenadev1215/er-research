@@ -1,9 +1,9 @@
-// 소량 수집기: 상위 랭커에서 출발해 경기 참가자를 따라가며 랭크 스쿼드 경기를 모은다.
-// 사용법: pnpm collect [목표 경기 수=300]
+// 수집기: 다이아몬드 하위 구간부터 경기 참가자를 따라가며 랭크 스쿼드 경기를 모은다.
+// 사용법: pnpm collect [목표 경기 수=300] [최대 실행 시간(시간)]
 // 중단 후 다시 실행하면 crawl_users 대기열에서 이어서 수집한다.
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
-import { asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, between, eq, gte, isNull, sql } from "drizzle-orm";
 import { crawlUsers, games, participants } from "../src/db/schema.ts";
 
 process.loadEnvFile(".env.local");
@@ -15,7 +15,15 @@ const RANKED = 3;
 const SQUAD = 3;
 const REQUEST_INTERVAL_MS = 1100;
 const MAX_RETRIES = 5;
+
+// 다이아몬드 5000~6399 (시즌 41, 사용자 확인). 이 값 이상인 유저를 MMR 낮은 순으로 처리한다.
+const DIAMOND_MIN = 5000;
+const DIAMOND_MAX = 6399;
+const SEED_GAMES = 60; // 씨앗 확보용으로 다시 조회할 기존 경기 수
+
 const targetGames = Number(process.argv[ 2 ] ?? 300);
+const maxHours = Number(process.argv[ 3 ] ?? Infinity);
+const deadline = Date.now() + maxHours * 3_600_000;
 
 if ( !API_KEY ) {
   throw new Error("ER_API_KEY가 .env.local에 없습니다.");
@@ -44,6 +52,7 @@ type GameRecord = {
   bestWeapon: number;
   traitFirstCore: number;
   mmrBefore: number;
+  mmrAfter: number;
   mmrGain: number;
   preMade: number;
 };
@@ -75,27 +84,53 @@ async function callApi<T extends ApiBody>(path: string): Promise<T | null> {
 
 const now = () => new Date().toISOString();
 
-function enqueue(nicknames: string[]) {
-  if ( nicknames.length === 0 ) return;
+// 대기열에 넣고, 이미 있으면 MMR만 최신 값으로 갱신한다.
+function enqueue(users: { nickname: string; mmr: number | null }[]) {
+  if ( users.length === 0 ) return;
   db.insert(crawlUsers)
-    .values(nicknames.map((nickname) => ({ nickname, createdAt: now() })))
-    .onConflictDoNothing()
+    .values(users.map((u) => ({ nickname: u.nickname, lastMmr: u.mmr, createdAt: now() })))
+    .onConflictDoUpdate({ target: crawlUsers.nickname, set: { lastMmr: sql`coalesce(excluded.last_mmr, ${ crawlUsers.lastMmr })` } })
     .run();
 }
 
-async function seedFromTopRanks() {
-  const queued = db.select({ n: sql<number>`count(*)` }).from(crawlUsers).get();
-  if ( queued && queued.n > 0 ) return;
-
-  const body = await callApi<ApiBody & { topRanks: { nickname: string }[] }>(
-    `/v1/rank/top/${ SEASON_ID }/${ SQUAD }`,
-  );
-  enqueue(body?.topRanks.map((r) => r.nickname) ?? []);
-  console.log(`상위 랭커 ${ body?.topRanks.length ?? 0 }명을 대기열에 추가`);
-}
+const enqueueParticipants = (records: GameRecord[]) =>
+  enqueue(records.map((r) => ({ nickname: r.nickname, mmr: r.mmrAfter ?? r.mmrBefore })));
 
 const isTargetGame = (g: GameRecord) =>
   g.seasonId === SEASON_ID && g.matchingMode === RANKED && g.matchingTeamMode === SQUAD;
+
+const fetchGame = async (gameId: number) =>
+  (await callApi<ApiBody & { userGames: GameRecord[] }>(`/v1/games/${ gameId }`))?.userGames ?? [];
+
+const diamondQueueSize = () =>
+  db.select({ n: sql<number>`count(*)` }).from(crawlUsers)
+    .where(and(isNull(crawlUsers.lastCrawledAt), gte(crawlUsers.lastMmr, DIAMOND_MIN)))
+    .get()?.n ?? 0;
+
+// 대기열에 다이아몬드 이상 유저가 없으면 씨앗을 만든다.
+// 기존 경기 중 다이아몬드 참가자가 있던 판을 다시 조회해 참가자를 MMR과 함께 넣는다.
+// 기존 DB가 비어 있으면 상위 랭커에서 출발한다.
+async function seedQueue() {
+  if ( diamondQueueSize() > 0 ) return;
+
+  const seedGameIds = db.selectDistinct({ id: participants.gameId }).from(participants)
+    .where(between(participants.mmrBefore, DIAMOND_MIN, DIAMOND_MAX))
+    .limit(SEED_GAMES)
+    .all()
+    .map((r) => r.id);
+
+  if ( seedGameIds.length > 0 ) {
+    for ( const id of seedGameIds ) enqueueParticipants(await fetchGame(id));
+    console.log(`다이아몬드 경기 ${ seedGameIds.length }판에서 씨앗 확보, 대기열 ${ diamondQueueSize() }명`);
+    return;
+  }
+
+  const body = await callApi<ApiBody & { topRanks: { nickname: string; mmr: number }[] }>(
+    `/v1/rank/top/${ SEASON_ID }/${ SQUAD }`,
+  );
+  enqueue(body?.topRanks.map((r) => ({ nickname: r.nickname, mmr: r.mmr })) ?? []);
+  console.log(`상위 랭커 ${ body?.topRanks.length ?? 0 }명을 대기열에 추가`);
+}
 
 function saveGame(records: GameRecord[]) {
   const first = records[ 0 ];
@@ -148,12 +183,11 @@ async function crawlUser(nickname: string, knownUserId: string | null): Promise<
 
     for ( const gameId of gameIds ) {
       if ( gameExists(gameId) ) continue;
-      const detail = await callApi<ApiBody & { userGames: GameRecord[] }>(`/v1/games/${ gameId }`);
-      const records = detail?.userGames ?? [];
+      const records = await fetchGame(gameId);
       if ( records.length === 0 || !isTargetGame(records[ 0 ]) ) continue;
 
       saveGame(records);
-      enqueue(records.map((r) => r.nickname));
+      enqueueParticipants(records);
       saved++;
     }
   }
@@ -163,22 +197,28 @@ async function crawlUser(nickname: string, knownUserId: string | null): Promise<
 }
 
 async function main() {
-  await seedFromTopRanks();
+  await seedQueue();
 
   let collected = 0;
   while ( collected < targetGames ) {
+    if ( Date.now() > deadline ) {
+      console.log(`실행 시간 ${ maxHours }시간 도달`);
+      break;
+    }
+
+    // 다이아몬드 이상 중 MMR이 낮은 유저부터 처리한다.
     const next = db.select().from(crawlUsers)
-      .where(isNull(crawlUsers.lastCrawledAt))
-      .orderBy(asc(crawlUsers.createdAt))
+      .where(and(isNull(crawlUsers.lastCrawledAt), gte(crawlUsers.lastMmr, DIAMOND_MIN)))
+      .orderBy(asc(crawlUsers.lastMmr))
       .limit(1)
       .get();
     if ( !next ) {
-      console.log("대기열이 비었습니다.");
+      console.log("대기열에 다이아몬드 이상 유저가 없습니다.");
       break;
     }
 
     collected += await crawlUser(next.nickname, next.userId);
-    console.log(`경기 ${ collected }/${ targetGames }`);
+    console.log(`경기 ${ collected }/${ targetGames } (현재 MMR ${ next.lastMmr })`);
   }
 
   const total = db.select({ n: sql<number>`count(*)` }).from(games).get();
