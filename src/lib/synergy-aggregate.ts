@@ -2,6 +2,9 @@
 
 export type Pick = { characterCode: number; weaponCode: number };
 
+// 팀원 지정 조건. weaponCode가 null이면 무기 무관.
+export type AllyFilter = { characterCode: number; weaponCode: number | null };
+
 // 내 실험체가 속한 팀 1개 = 1행
 export type TeamRow = {
   gameRank: number;
@@ -12,9 +15,7 @@ export type TeamRow = {
 
 export type NamedPick = Pick & { characterName: string; weaponName: string };
 
-export type SynergyCombo = {
-  key: string;
-  mates: [ NamedPick, NamedPick ];
+export type Stats = {
   games: number;
   winRate: number;
   top3Rate: number;
@@ -22,6 +23,9 @@ export type SynergyCombo = {
   avgRank: number;
   baselineWinRate: number; // 1 / 팀 수의 평균. 팀 수가 경기마다 달라 고정값을 쓰지 않는다
 };
+
+// mates: 지정한 팀원을 뺀 "남은 자리". 팀원 0명 지정 시 2명, 1명 지정 시 1명, 2명 지정 시 0명.
+export type SynergyCombo = Stats & { key: string; mates: NamedPick[] };
 
 type NameLookup = {
   character: (code: number) => string;
@@ -32,33 +36,64 @@ const comparePick = (x: Pick, y: Pick) =>
   x.characterCode - y.characterCode || x.weaponCode - y.weaponCode;
 
 // A+B와 B+A를 같은 조합으로 묶기 위해 정렬된 키를 만든다.
-const comboKey = (mates: [ Pick, Pick ]) =>
-  [ ...mates ].sort(comparePick).map((m) => `${ m.characterCode }:${ m.weaponCode }`).join("|");
+const comboKey = (mates: Pick[]) =>
+  mates.length === 0 ? "team" : [ ...mates ].sort(comparePick).map((m) => `${ m.characterCode }:${ m.weaponCode }`).join("|");
 
-export function aggregateSynergy(rows: TeamRow[], names: NameLookup): SynergyCombo[] {
-  const acc = new Map<string, {
-    mates: [ Pick, Pick ];
-    games: number;
-    wins: number;
-    top3: number;
-    rpSum: number;
-    rankSum: number;
-    baselineSum: number;
-  }>();
+const matches = (ally: AllyFilter, pick: Pick) =>
+  ally.characterCode === pick.characterCode && ( ally.weaponCode === null || ally.weaponCode === pick.weaponCode );
+
+// 지정한 팀원을 서로 다른 자리에 대응시키고 남은 자리를 돌려준다. 대응이 안 되면 null.
+export function remainingMates(mates: [ Pick, Pick ], allies: AllyFilter[]): Pick[] | null {
+  if ( allies.length === 0 ) return mates;
+  if ( allies.length === 1 ) {
+    if ( matches(allies[ 0 ], mates[ 0 ]) ) return [ mates[ 1 ] ];
+    if ( matches(allies[ 0 ], mates[ 1 ]) ) return [ mates[ 0 ] ];
+    return null;
+  }
+  const [ a, b ] = allies;
+  const fits = ( matches(a, mates[ 0 ]) && matches(b, mates[ 1 ]) ) || ( matches(a, mates[ 1 ]) && matches(b, mates[ 0 ]) );
+  return fits ? [] : null;
+}
+
+type Acc = { games: number; wins: number; top3: number; rpSum: number; rankSum: number; baselineSum: number };
+
+const emptyAcc = (): Acc => ({ games: 0, wins: 0, top3: 0, rpSum: 0, rankSum: 0, baselineSum: 0 });
+
+function add(acc: Acc, row: TeamRow) {
+  acc.games++;
+  if ( row.gameRank === 1 ) acc.wins++;
+  if ( row.gameRank <= 3 ) acc.top3++;
+  acc.rpSum += row.mmrGain;
+  acc.rankSum += row.gameRank;
+  acc.baselineSum += 1 / row.teamCount;
+}
+
+const toStats = (s: Acc): Stats => ({
+  games: s.games,
+  winRate: s.games ? s.wins / s.games : 0,
+  top3Rate: s.games ? s.top3 / s.games : 0,
+  avgRp: s.games ? s.rpSum / s.games : 0,
+  avgRank: s.games ? s.rankSum / s.games : 0,
+  baselineWinRate: s.games ? s.baselineSum / s.games : 0,
+});
+
+// 팀원 지정 없이 내 실험체의 전체 성적. 요약 카드의 비교 기준.
+export function summarize(rows: TeamRow[]): Stats {
+  const acc = emptyAcc();
+  for ( const row of rows ) add(acc, row);
+  return toStats(acc);
+}
+
+export function aggregateSynergy(rows: TeamRow[], names: NameLookup, allies: AllyFilter[] = []): SynergyCombo[] {
+  const groups = new Map<string, Acc & { mates: Pick[] }>();
 
   for ( const row of rows ) {
-    const key = comboKey(row.mates);
-    const s = acc.get(key) ?? {
-      mates: [ ...row.mates ].sort(comparePick) as [ Pick, Pick ],
-      games: 0, wins: 0, top3: 0, rpSum: 0, rankSum: 0, baselineSum: 0,
-    };
-    s.games++;
-    if ( row.gameRank === 1 ) s.wins++;
-    if ( row.gameRank <= 3 ) s.top3++;
-    s.rpSum += row.mmrGain;
-    s.rankSum += row.gameRank;
-    s.baselineSum += 1 / row.teamCount;
-    acc.set(key, s);
+    const rest = remainingMates(row.mates, allies);
+    if ( rest === null ) continue;
+    const key = comboKey(rest);
+    const g = groups.get(key) ?? { ...emptyAcc(), mates: [ ...rest ].sort(comparePick) };
+    add(g, row);
+    groups.set(key, g);
   }
 
   const named = (p: Pick): NamedPick => ({
@@ -67,14 +102,5 @@ export function aggregateSynergy(rows: TeamRow[], names: NameLookup): SynergyCom
     weaponName: names.weapon(p.weaponCode),
   });
 
-  return [ ...acc ].map(([ key, s ]) => ({
-    key,
-    mates: [ named(s.mates[ 0 ]), named(s.mates[ 1 ]) ] as [ NamedPick, NamedPick ],
-    games: s.games,
-    winRate: s.wins / s.games,
-    top3Rate: s.top3 / s.games,
-    avgRp: s.rpSum / s.games,
-    avgRank: s.rankSum / s.games,
-    baselineWinRate: s.baselineSum / s.games,
-  }));
+  return [ ...groups ].map(([ key, g ]) => ({ key, mates: g.mates.map(named), ...toStats(g) }));
 }

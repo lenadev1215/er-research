@@ -3,17 +3,26 @@ import { and, eq, gt, ne, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import { db } from "@/db";
 import { characters, games, participants, traits, weapons } from "@/db/schema";
-import { aggregateSynergy, type SynergyCombo, type TeamRow } from "./synergy-aggregate";
+import {
+  aggregateSynergy,
+  summarize,
+  type AllyFilter,
+  type Stats,
+  type SynergyCombo,
+  type TeamRow,
+} from "./synergy-aggregate";
 
 export type SynergyQuery = {
   characterCode: number;
   weaponCode: number;
   coreTraitCode?: number;
+  allies: AllyFilter[]; // 0~2명
 };
 
 export type SynergyResponse = {
   me: { characterName: string; weaponName: string; coreTraitName: string | null };
-  totalGames: number;
+  totalGames: number; // 팀원 조건까지 적용한 판수
+  baseline: Stats; // 팀원 조건 없이 내 실험체 전체 성적
   combos: SynergyCombo[];
 };
 
@@ -72,7 +81,7 @@ export function getSynergy(query: SynergyQuery): SynergyResponse {
   };
 
   const rows = fetchTeamRows(query);
-  const combos = aggregateSynergy(rows, names)
+  const combos = aggregateSynergy(rows, names, query.allies)
     .sort((x, y) => y.games - x.games || y.avgRp - x.avgRp);
 
   return {
@@ -81,7 +90,8 @@ export function getSynergy(query: SynergyQuery): SynergyResponse {
       weaponName: names.weapon(query.weaponCode),
       coreTraitName: trait?.name ?? null,
     },
-    totalGames: rows.length,
+    totalGames: combos.reduce((sum, c) => sum + c.games, 0),
+    baseline: summarize(rows),
     combos,
   };
 }

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { parseCode } from "@/lib/params";
 import { getCoreTraitShares } from "@/lib/traits";
 
-// GET /api/traits?character=77&weapon=24 → 사용 비율 10% 이상인 핵심 특성
+// GET /api/traits?character=77&weapon=24 → 해당 실험체/무기로 쓰인 모든 핵심 특성 (비율 높은 순)
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const characterCode = parseCode(params.get("character"));
