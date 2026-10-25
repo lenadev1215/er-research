@@ -17,14 +17,17 @@ type SynergyUiState = {
   setCriterion: (criterion: Criterion) => void;
   setMinGames: (minGames: number) => void;
   toggleSort: (key: SortKey) => void;
+  setSortKey: (key: SortKey) => void; // 모바일 정렬 선택 상자용. 방향은 지표별 기본값
 };
 
 export const useSynergyUi = create<SynergyUiState>()((set) => ({
   criterion: "overall",
   minGames: 1, // 표본 확보 전 임시값. 기획 기본값은 30판
   sort: { key: "score", dir: "desc" },
-  setCriterion: (criterion) => set({ criterion }),
+  // 기준을 바꾸면 그 기준 점수 순으로 다시 보여준다.
+  setCriterion: (criterion) => set({ criterion, sort: { key: "score", dir: "desc" } }),
   setMinGames: (minGames) => set({ minGames }),
+  setSortKey: (key) => set({ sort: { key, dir: defaultDir(key) } }),
   toggleSort: (key) => set(({ sort }) => ({
     sort: sort.key === key
       ? { key, dir: sort.dir === "asc" ? "desc" : "asc" }

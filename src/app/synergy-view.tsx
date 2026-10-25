@@ -122,7 +122,7 @@ function Results({ data, isPending, isError, errorMessage, isStale, allyCount, c
       <CriterionControls />
 
       {result.ranked.length > 0 ? (
-        <ComboTable combos={result.ranked} groupLabel={groupLabel} />
+        <ComboTable combos={result.ranked} groupLabel={groupLabel} showTier={criterion === "overall"} />
       ) : (
         <p className="rounded-md bg-surface px-5 py-8 text-sm text-muted">
           최소 판수를 넘는 조합이 없습니다. 최소 판수를 낮추면 판정할 수 있습니다.

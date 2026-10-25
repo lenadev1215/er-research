@@ -13,7 +13,7 @@ export function CriterionControls() {
 
   return (
     <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-      <div role="radiogroup" aria-label="티어 기준" className="flex rounded-md bg-rail p-1">
+      <div role="radiogroup" aria-label="정렬 기준. 등급은 종합 기준에서만 표시합니다" className="flex rounded-md bg-rail p-1">
         {(Object.keys(CRITERION_LABELS) as Criterion[]).map((key) => {
           const active = key === criterion;
           return (
