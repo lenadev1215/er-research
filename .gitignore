@@ -48,3 +48,7 @@ next-env.d.ts
 /.claude/
 /.vscode/
 CLAUDE.md
+
+# 팬킷 실험체 이미지: 사용 허가 확인 전까지 커밋하지 않음
+/public/characters/*
+!/public/characters/.gitkeep

@@ -1,26 +1,52 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/* 실험 결과 판정표: 차가운 연구소 톤 + VF 보라 한 계열. 티어는 VF 농도로 순서를 표현한다. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-paper: #eef1f4;
+  --color-surface: #f8fafb;
+  --color-rail: #e1e6eb;
+  --color-line: #d5dbe2;
+  --color-ink: #1c2430;
+  --color-muted: #6b7685;
+  --color-vf: #4b3fd8;
+  --color-alert: #b4233c;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --color-tier-s: #4b3fd8;
+  --color-tier-a: #6e66e0;
+  --color-tier-b: #9a96d9;
+  --color-tier-c: #bfc3cf;
+  --color-tier-d: #d6d9e0;
+
+  --font-sans: var(--font-plex-kr);
+  --font-display: var(--font-shoulders);
+
+  --animate-settle: settle 220ms ease-out both;
+
+  @keyframes settle {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
 }
 
+:root {
+  color-scheme: light;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-plex-kr), system-ui, sans-serif;
+  word-break: keep-all; /* 한국어는 어절 단위로 줄바꿈 */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-settle {
+    animation: none;
+  }
 }
