@@ -9,23 +9,20 @@ export type SortDir = "asc" | "desc";
 // 평균 순위만 낮을수록 좋다.
 const defaultDir = (key: SortKey): SortDir => (key === "avgRank" ? "asc" : "desc");
 
+// 실험체·무기·특성 선택은 URL이 맡는다 (hooks/use-selection.ts).
 type SynergyUiState = {
-  coreTraitCode: number | null; // null = 전체 특성
   criterion: Criterion;
   minGames: number;
   sort: { key: SortKey; dir: SortDir };
-  setCoreTraitCode: (code: number | null) => void;
   setCriterion: (criterion: Criterion) => void;
   setMinGames: (minGames: number) => void;
   toggleSort: (key: SortKey) => void;
 };
 
 export const useSynergyUi = create<SynergyUiState>()((set) => ({
-  coreTraitCode: null,
   criterion: "overall",
   minGames: 1, // 표본 확보 전 임시값. 기획 기본값은 30판
   sort: { key: "score", dir: "desc" },
-  setCoreTraitCode: (coreTraitCode) => set({ coreTraitCode }),
   setCriterion: (criterion) => set({ criterion }),
   setMinGames: (minGames) => set({ minGames }),
   toggleSort: (key) => set(({ sort }) => ({

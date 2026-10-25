@@ -51,12 +51,16 @@ export function PickBadge({ pick, size = "md" }: { pick: NamedPick; size?: Size 
   );
 }
 
-export function PickPair({ mates, size = "md" }: { mates: [ NamedPick, NamedPick ]; size?: Size }) {
+// 남은 자리 1~2명을 "+"로 이어 보여준다.
+export function PickGroup({ mates, size = "md" }: { mates: NamedPick[]; size?: Size }) {
   return (
     <span className="inline-flex items-start gap-1.5">
-      <PickBadge pick={mates[ 0 ]} size={size} />
-      <span aria-label="그리고" className="text-muted" style={{ marginTop: SIZES[ size ].px / 2 - 9 }}>+</span>
-      <PickBadge pick={mates[ 1 ]} size={size} />
+      {mates.map((m, i) => (
+        <span key={`${ m.characterCode }:${ m.weaponCode }`} className="inline-flex items-start gap-1.5">
+          {i > 0 && <span aria-label="그리고" className="text-muted" style={{ marginTop: SIZES[ size ].px / 2 - 9 }}>+</span>}
+          <PickBadge pick={m} size={size} />
+        </span>
+      ))}
     </span>
   );
 }
