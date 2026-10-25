@@ -33,7 +33,8 @@ export function CriterionControls() {
         })}
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-muted">
+      {/* 모바일에서는 숨긴다. 표의 표시 기준(md)과 맞춘다. */}
+      <label className="hidden items-center gap-2 text-sm text-muted md:flex">
         최소 판수
         <select
           value={minGames}
