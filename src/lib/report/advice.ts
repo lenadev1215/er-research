@@ -272,9 +272,25 @@ export async function* streamAdvice(stats: ReportStats, signal: AbortSignal): As
     messages: [ { role: "user", content: JSON.stringify(toPayload(stats)) } ],
   }, { signal });
 
+  let chars = 0;
   for await (const event of stream) {
-    if ( event.type === "content_block_delta" && event.delta.type === "text_delta" ) yield event.delta.text;
+    if ( event.type === "content_block_delta" && event.delta.type === "text_delta" ) {
+      chars += event.delta.text.length;
+      yield event.delta.text;
+    }
   }
   const final = await stream.finalMessage();
-  if ( final.stop_reason === "refusal" ) throw new Error("advice refused");
+  // 메시지에는 중단 이유만 담는다 (route.ts가 로그에 남긴다). 입력·출력 내용은 넣지 않는다.
+  if ( final.stop_reason === "refusal" ) throw new AdviceError("refusal");
+  // 정상 종료인데 글이 없는 경우가 배포본에서 한 번 있었다 (2026-10-26). 성공으로 캐시하지 않게 실패로 돌린다.
+  if ( chars === 0 ) throw new AdviceError(`empty:${ final.stop_reason ?? "unknown" }`);
+}
+
+export class AdviceError extends Error {
+  readonly reason: string;
+  constructor(reason: string) {
+    super(`advice ${ reason }`);
+    this.name = "AdviceError";
+    this.reason = reason;
+  }
 }

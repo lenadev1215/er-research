@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
 import { ErApiBusyError } from "@/lib/er-api/client";
-import { streamAdvice } from "@/lib/report/advice";
+import { AdviceError, streamAdvice } from "@/lib/report/advice";
 import { buildReport } from "@/lib/report/compare";
 import { clientIp, nicknameKey, readCache, takeRateLimit, writeCache } from "@/lib/report/guard";
 import { fetchRecentGames } from "@/lib/report/recent-games";
@@ -53,11 +53,13 @@ async function* live(key: string | null, stats: ReportStats, signal: AbortSignal
     }
   } catch (error) {
     if ( signal.aborted ) return;
-    console.warn(`[report] 소견 생성 실패: ${ error instanceof Error ? error.name : "unknown" }`);
+    const reason = error instanceof AdviceError ? ` (${ error.reason })` : "";
+    console.warn(`[report] 소견 생성 실패: ${ error instanceof Error ? error.name : "unknown" }${ reason }`);
     yield { type: "error", code: "advice-failed" };
     return;
   }
-  if ( key ) writeCache(key, stats, advice);
+  // 빈 소견은 캐시하지 않는다 (streamAdvice가 막지만 한 번 더 확인).
+  if ( key && advice.trim() ) writeCache(key, stats, advice);
   yield { type: "done" };
 }
 
