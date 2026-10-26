@@ -67,3 +67,30 @@ export async function findTeammates(records: RecentRecord[], signal: AbortSignal
   }
   return result;
 }
+
+// 캐리·버스 판 목록에 팀 딜량을 보여주려고, findTeammates가 채우지 못한 판(일반 경기, 상세 조회 상한 밖)만 따로 조회한다.
+// 결과는 목록 표시에만 쓴다. 팀원 조합 비교와 딜 점유율에는 넣지 않는다 (둘 다 랭크 판 기준).
+const IMPACT_DETAIL_LIMIT = 6;
+
+export async function findImpactTeamDamage(
+  records: RecentRecord[],
+  indices: number[],
+  teams: Map<number, TeamInfo>,
+  signal: AbortSignal,
+): Promise<Map<number, number>> {
+  const result = new Map<number, number>();
+  let detailCalls = 0;
+  for ( const i of indices ) {
+    if ( teams.get(i)?.damage != null ) continue;
+    const record = records[ i ];
+    const fromDb = record.mode === "rankSquad" ? teamFromDb(record) : null;
+    let info = fromDb;
+    if ( !info ) {
+      if ( detailCalls >= IMPACT_DETAIL_LIMIT ) continue;
+      detailCalls++;
+      info = await teamFromApi(record, signal);
+    }
+    if ( info?.damage != null ) result.set(i, info.damage);
+  }
+  return result;
+}

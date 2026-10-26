@@ -1,5 +1,9 @@
-import type { ImpactSummary, MyMetrics, Playstyle, ReportTeam, ReportVision, SeasonMost, TeamRole } from "@/lib/report/types";
+"use client";
+
+import { useState, type ReactNode } from "react";
+import type { GameImpact, ImpactSummary, MyMetrics, Playstyle, RecentGame, ReportTeam, ReportVision, SeasonMost, TeamRole } from "@/lib/report/types";
 import { damage, percent, signedRp } from "@/components/synergy/format";
+import { ImpactGames } from "./impact-games";
 import { SeasonMostList } from "./season-most";
 
 type Metric = { label: string; value: string; note?: string | null };
@@ -20,6 +24,7 @@ type Props = {
   impact: ImpactSummary | undefined;
   most: SeasonMost[] | undefined;
   playstyle: Playstyle | null | undefined;
+  recent: RecentGame[];
 };
 
 const PLAYSTYLE: Record<Playstyle, { label: string; title: string }> = {
@@ -27,7 +32,7 @@ const PLAYSTYLE: Record<Playstyle, { label: string; title: string }> = {
   survivor: { label: "생존왕", title: "TOP3 판의 시야 점수가 같은 실험체의 TOP3 판 평균보다 5점 이상 높고, 데스는 같은 실험체 평균보다 적습니다" },
 };
 
-export function ReportSummary({ overall, vision, team, impact, most, playstyle }: Props) {
+export function ReportSummary({ overall, vision, team, impact, most, playstyle, recent }: Props) {
   // 이전 형식으로 저장한 고정 데이터(개발용)에는 score·team이 없을 수 있어 undefined도 없음으로 본다.
   const score = vision.all.score ?? null;
   const refScore = vision.ref?.score ?? null;
@@ -48,13 +53,17 @@ export function ReportSummary({ overall, vision, team, impact, most, playstyle }
     <div className="flex flex-col gap-5">
       <MetricList metrics={metrics} />
       {most && most.length > 0 && <SeasonMostList most={most} />}
-      {team && <TeamRow team={team} impact={impact} playstyle={playstyle ?? null} />}
+      {team && <TeamRow team={team} impact={impact} playstyle={playstyle ?? null} recent={recent} />}
     </div>
   );
 }
 
 // 캐리·버스는 TOP3 판 중 같은 실험체 평균과 비교해 판정한 판수다.
-function TeamRow({ team, impact, playstyle }: { team: ReportTeam; impact: ImpactSummary | undefined; playstyle: Playstyle | null }) {
+type TeamRowProps = { team: ReportTeam; impact: ImpactSummary | undefined; playstyle: Playstyle | null; recent: RecentGame[] };
+
+function TeamRow({ team, impact, playstyle, recent }: TeamRowProps) {
+  // 펼친 목록 (캐리 / 버스 / 닫힘). 이전 형식 고정 데이터에는 판별 기록(detail)이 없어 목록이 비어 보인다.
+  const [ open, setOpen ] = useState<GameImpact | null>(null);
   const { me, ref } = team;
   const share = (v: number | null | undefined) => ( v == null ? "-" : percent(v) );
   const refNote = (v: number | null | undefined, format: (x: number) => string) => ( v == null ? null : `같은 실험체 평균 ${ format(v) }` );
@@ -67,11 +76,25 @@ function TeamRow({ team, impact, playstyle }: { team: ReportTeam; impact: Impact
       value: share(me.damageShare),
       note: refNote(ref?.damageShare, percent),
     },
-    ...( impact ? [
-      { label: "캐리한 판", value: `${ impact.carry }판`, note: `TOP3 ${ impact.top3 }판 중` },
-      { label: "버스 탄 판", value: `${ impact.bus }판`, note: `TOP3 ${ impact.top3 }판 중` },
-    ] : [] ),
   ];
+  const toggles = impact && ( [ [ "carry", "캐리한 판", impact.carry ], [ "bus", "버스 탄 판", impact.bus ] ] as const ).map(([ key, label, count ]) => (
+    <div key={key} className="flex flex-col gap-0.5">
+      <dt className="text-xs text-muted">{label}</dt>
+      <dd>
+        <button
+          type="button"
+          aria-expanded={open === key}
+          aria-controls="impact-games"
+          onClick={() => setOpen(open === key ? null : key)}
+          className={`inline-flex items-center gap-1 rounded text-lg font-semibold tabular-nums underline decoration-dotted underline-offset-4 focus-visible:outline-2 focus-visible:outline-vf ${ open === key ? "text-vf" : "text-ink" }`}
+        >
+          {count}판
+          <span aria-hidden className={`text-xs transition-transform ${ open === key ? "rotate-180" : "" }`}>▾</span>
+        </button>
+      </dd>
+      <dd className="text-xs tabular-nums text-muted">TOP3 {impact.top3}판 중</dd>
+    </div>
+  ));
 
   return (
     <section aria-labelledby="team-heading" className="flex flex-col gap-3">
@@ -86,7 +109,12 @@ function TeamRow({ team, impact, playstyle }: { team: ReportTeam; impact: Impact
         )}
         {( team.role === null || ( team.role === "balanced" && !playstyle ) ) && <RoleBadge role={team.role} />}
       </div>
-      <MetricList metrics={metrics} />
+      <MetricList metrics={metrics} extra={toggles} />
+      {open && (
+        <div id="impact-games">
+          <ImpactGames games={recent} impact={open} />
+        </div>
+      )}
     </section>
   );
 }
@@ -107,7 +135,7 @@ function RoleBadge({ role }: { role: TeamRole | null }) {
   );
 }
 
-function MetricList({ metrics }: { metrics: Metric[] }) {
+function MetricList({ metrics, extra }: { metrics: Metric[]; extra?: ReactNode }) {
   return (
     <dl className="grid grid-cols-3 gap-x-6 gap-y-3 sm:grid-cols-6">
       {metrics.map((m) => (
@@ -117,6 +145,7 @@ function MetricList({ metrics }: { metrics: Metric[] }) {
           {m.note && <dd className="text-xs tabular-nums text-muted">{m.note}</dd>}
         </div>
       ))}
+      {extra}
     </dl>
   );
 }

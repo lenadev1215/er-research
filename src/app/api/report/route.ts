@@ -2,10 +2,10 @@ import { readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
 import { ErApiBusyError } from "@/lib/er-api/client";
 import { AdviceError, streamAdvice } from "@/lib/report/advice";
-import { buildReport } from "@/lib/report/compare";
+import { buildReport, judgeImpacts } from "@/lib/report/compare";
 import { clientIp, nicknameKey, readCache, takeRateLimit, writeCache } from "@/lib/report/guard";
 import { fetchRecentGames } from "@/lib/report/recent-games";
-import { findTeammates } from "@/lib/report/teammates";
+import { findImpactTeamDamage, findTeammates } from "@/lib/report/teammates";
 import type { ReportErrorCode, ReportEvent, ReportStats } from "@/lib/report/types";
 
 // POST /api/report  body { nickname } → NDJSON 스트림 (stats → advice* → done | error)
@@ -150,7 +150,10 @@ export async function POST(request: Request) {
     const { records, most } = recent;
     if ( records.length === 0 ) return fail("no-games", 404);
     const teams = await findTeammates(records, request.signal);
-    stats = buildReport(records, teams, most);
+    const judgments = judgeImpacts(records);
+    const impactIndices = judgments.flatMap((j, i) => ( j.impact ? [ i ] : [] ));
+    const impactTeamDamage = await findImpactTeamDamage(records, impactIndices, teams, request.signal);
+    stats = buildReport(records, teams, most, judgments, impactTeamDamage);
   } catch (error) {
     if ( error instanceof ErApiBusyError ) return fail("busy", 503);
     // 오류 메시지에는 경로가 없다 (er-api/client.ts). 그래도 이름만 남긴다.

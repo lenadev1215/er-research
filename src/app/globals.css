@@ -10,6 +10,9 @@
   --color-muted: #6b7685;
   --color-vf: #4b3fd8;
   --color-alert: #b4233c;
+  /* 캐리·버스 판 목록의 딜량 배율 (사용자 결정: 캐리 선홍, 버스 파랑). 둘 다 surface 위 대비 4.5:1 이상 */
+  --color-carry: #cc2d63;
+  --color-bus: #2563eb;
 
   --color-tier-s: #4b3fd8;
   --color-tier-a: #6e66e0;

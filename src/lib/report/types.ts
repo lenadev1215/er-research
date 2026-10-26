@@ -18,6 +18,18 @@ export type RecentGame = {
   damage: number;
   pick: NamedPick;
   impact: GameImpact | null; // TOP3가 아니거나, 기준이 없거나, 둘 다 아니면 null
+  detail: ImpactDetail | null; // 캐리·버스 판만 있다
+};
+
+// 캐리·버스 판의 기록. 배율은 같은 실험체의 TOP3 판 평균 대비 (lib/report/impact.ts).
+export type ImpactDetail = {
+  kills: number;
+  assists: number;
+  deaths: number;
+  kda: number;
+  damageRatio: number | null;
+  kdaRatio: number | null;
+  teamDamage: number | null; // 내 딜량 포함 팀 3명의 합. 팀 정보를 받지 못했으면 null
 };
 
 // 판당 평균 킬·어시스트·데스와 KDA ((킬 + 어시스트) / 데스, lib/report/kda.ts). 소견 입력에만 쓴다.

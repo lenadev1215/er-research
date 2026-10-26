@@ -112,16 +112,24 @@ function teamSummary(records: RecentRecord[], teams: Map<number, TeamInfo>, team
 
 // TOP3 판만 판정한다. 같은 실험체의 TOP3 판 평균과 비교하므로 (lib/report/impact.ts) 딜량이 원래 낮은 탱커도 같은 잣대로 본다.
 // 캐리·버스 모두 비교할 수 있는 지표가 전부 기준을 넘어야 한다. 비교할 지표가 없으면 판정하지 않는다.
-function gameImpact(r: RecentRecord, base: ImpactBase): GameImpact | null | undefined {
-  if ( r.rank > 3 ) return null;
-  const ratios = [
-    base.damage ? r.damage / base.damage : null,
-    base.kda ? toKda(r.kills, r.assists, r.deaths).kda / base.kda : null,
-  ].filter((v): v is number => v !== null);
-  if ( ratios.length === 0 ) return undefined; // 판정 불가
-  if ( ratios.every((v) => v >= CARRY_RATIO) ) return "carry";
-  if ( ratios.every((v) => v <= BUS_RATIO) ) return "bus";
-  return null;
+// impact: undefined는 판정 불가(비교할 기준 없음), null은 해당 없음. 배율은 화면의 캐리·버스 판 목록에 쓴다.
+export type ImpactJudgment = { impact: GameImpact | null | undefined; damageRatio: number | null; kdaRatio: number | null };
+
+function gameImpact(r: RecentRecord, base: ImpactBase): ImpactJudgment {
+  const damageRatio = base.damage ? r.damage / base.damage : null;
+  const kdaRatio = base.kda ? toKda(r.kills, r.assists, r.deaths).kda / base.kda : null;
+  if ( r.rank > 3 ) return { impact: null, damageRatio, kdaRatio };
+  const ratios = [ damageRatio, kdaRatio ].filter((v): v is number => v !== null);
+  if ( ratios.length === 0 ) return { impact: undefined, damageRatio, kdaRatio };
+  if ( ratios.every((v) => v >= CARRY_RATIO) ) return { impact: "carry", damageRatio, kdaRatio };
+  if ( ratios.every((v) => v <= BUS_RATIO) ) return { impact: "bus", damageRatio, kdaRatio };
+  return { impact: null, damageRatio, kdaRatio };
+}
+
+// 판별 캐리·버스 판정. route.ts가 buildReport 전에 불러 캐리·버스 판의 팀 딜량을 따로 조회한다.
+export function judgeImpacts(records: RecentRecord[]): ImpactJudgment[] {
+  const base = loadImpactBaseline();
+  return records.map((r) => gameImpact(r, base(r.characterCode, r.weaponCode)));
 }
 
 // 시야 뱃지. TOP3 판끼리 비교해 생존 시간의 영향을 덜어 낸다. 데스는 전체 판 평균을 같은 실험체 평균과 비교한다.
@@ -140,7 +148,14 @@ function groupBy<T>(items: T[], keyOf: (item: T) => string): Map<string, T[]> {
   return map;
 }
 
-export function buildReport(records: RecentRecord[], teams: Map<number, TeamInfo>, seasonMost: SeasonCharacterStat[]): ReportStats {
+// impactTeamDamage: 캐리·버스 판 중 teams에 팀 딜량이 없어 따로 조회한 판의 팀 딜량 (목록 표시 전용).
+export function buildReport(
+  records: RecentRecord[],
+  teams: Map<number, TeamInfo>,
+  seasonMost: SeasonCharacterStat[],
+  judgments: ImpactJudgment[],
+  impactTeamDamage: Map<number, number>,
+): ReportStats {
   const characterNames = new Map(db.select().from(characters).all().map((c) => [ c.code, c.name ]));
   const weaponNames = new Map(db.select().from(weapons).all().map((w) => [ w.code, w.name ]));
   const named = (p: Pick): NamedPick => ({
@@ -213,8 +228,7 @@ export function buildReport(records: RecentRecord[], teams: Map<number, TeamInfo
     });
 
   // 판별 기여: 같은 실험체·무기가 TOP3로 끝난 판의 DB 평균 딜량·KDA와 비교한다.
-  const impactBase = loadImpactBaseline();
-  const impacts = records.map((r) => gameImpact(r, impactBase(r.characterCode, r.weaponCode)));
+  const impacts = judgments.map((j) => j.impact);
   const impact: ImpactSummary = {
     top3: records.filter((r) => r.rank <= 3).length,
     judged: records.filter((r, i) => r.rank <= 3 && impacts[ i ] !== undefined).length,
@@ -251,6 +265,15 @@ export function buildReport(records: RecentRecord[], teams: Map<number, TeamInfo
     damage: r.damage,
     pick: named(pickOf(r)),
     impact: impacts[ i ] ?? null,
+    detail: impacts[ i ] ? {
+      kills: r.kills,
+      assists: r.assists,
+      deaths: r.deaths,
+      kda: toKda(r.kills, r.assists, r.deaths).kda,
+      damageRatio: judgments[ i ].damageRatio,
+      kdaRatio: judgments[ i ].kdaRatio,
+      teamDamage: teams.get(i)?.damage ?? impactTeamDamage.get(i) ?? null,
+    } : null,
   })).reverse();
 
   const top3 = records.filter((r) => r.rank <= 3);
