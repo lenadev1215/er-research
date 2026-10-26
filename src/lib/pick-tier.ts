@@ -75,3 +75,16 @@ export function getPickTier(characterCode: number, weaponCode: number): PickTier
     minGames: PICK_MIN_GAMES,
   };
 }
+
+// 여러 실험체·무기를 한 번에 비교할 때 쓴다. 전체 집계와 등급 계산을 한 번만 한다.
+export function pickTierLookup(): (characterCode: number, weaponCode: number) => { stats: PickStats; tier: Tier | null } | null {
+  const all = aggregatePicks();
+  const combos: SynergyCombo[] = [ ...all ].map(([ k, s ]) => ({ ...s, key: k, mates: [] }));
+  const tiers = new Map(assignTiers(combos, "overall", PICK_MIN_GAMES).ranked.map((c) => [ c.key, c.tier ]));
+
+  return (characterCode, weaponCode) => {
+    const k = key(characterCode, weaponCode);
+    const stats = all.get(k);
+    return stats ? { stats, tier: tiers.get(k) ?? null } : null;
+  };
+}

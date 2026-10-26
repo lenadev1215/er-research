@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Big_Shoulders, IBM_Plex_Sans_KR } from "next/font/google";
+import { SiteTabs } from "@/components/nav/site-tabs";
 import "./globals.css";
 import { Providers } from "./providers";
 
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${plexKr.variable} ${shoulders.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <SiteTabs />
         <Providers>{children}</Providers>
       </body>
     </html>

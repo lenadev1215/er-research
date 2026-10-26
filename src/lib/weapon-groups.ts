@@ -14,5 +14,9 @@ const ALL_WEAPON_CHARACTERS = [ 27 ]; // 알렉스
 export const groupedWeapon = (table: { characterCode: AnySQLiteColumn; weaponCode: AnySQLiteColumn }): SQL<number> =>
   sql<number>`case when ${ table.characterCode } in (${ sql.join(ALL_WEAPON_CHARACTERS.map((code) => sql`${ code }`), sql`, `) }) then ${ ALL_WEAPONS_CODE } else ${ table.weaponCode } end`;
 
+// groupedWeapon과 같은 규칙을 API 기록(DB 밖 값)에 적용한다.
+export const groupWeaponCode = (characterCode: number, weaponCode: number) =>
+  ALL_WEAPON_CHARACTERS.includes(characterCode) ? ALL_WEAPONS_CODE : weaponCode;
+
 export const weaponName = (code: number, names: Map<number, string>) =>
   code === ALL_WEAPONS_CODE ? ALL_WEAPONS_NAME : names.get(code) ?? `#${ code }`;

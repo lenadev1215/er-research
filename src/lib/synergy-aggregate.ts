@@ -38,7 +38,7 @@ const comparePick = (x: Pick, y: Pick) =>
   x.characterCode - y.characterCode || x.weaponCode - y.weaponCode;
 
 // A+B와 B+A를 같은 조합으로 묶기 위해 정렬된 키를 만든다.
-const comboKey = (mates: Pick[]) =>
+export const comboKey = (mates: Pick[]) =>
   mates.length === 0 ? "team" : [ ...mates ].sort(comparePick).map((m) => `${ m.characterCode }:${ m.weaponCode }`).join("|");
 
 const matches = (ally: AllyFilter, pick: Pick) =>
