@@ -95,6 +95,7 @@ function saveGame(records: GameRecord[]) {
       mmrBefore: r.mmrBefore,
       mmrGain: r.mmrGain,
       teamKill: r.teamKill,
+      damageToPlayer: r.damageToPlayer,
       preMade: r.preMade,
     }))).run();
   });

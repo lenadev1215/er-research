@@ -1,0 +1,1 @@
+ALTER TABLE `participants` ADD `damage_to_player` integer;

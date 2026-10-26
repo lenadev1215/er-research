@@ -13,7 +13,7 @@
     "collect": "node scripts/collect.mts",
     "load-meta": "node scripts/load-meta.mts",
     "snapshot": "node scripts/snapshot.mts",
-    "backfill-tk": "node scripts/backfill-team-kill.mts"
+    "backfill": "node scripts/backfill.mts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.5",

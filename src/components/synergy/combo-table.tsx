@@ -1,33 +1,11 @@
 "use client";
 
 import { useIncrementalList } from "@/hooks/use-incremental-list";
-import { compareRank, type RankedCombo, type Tier } from "@/lib/tier";
+import { compareRank, type RankedCombo } from "@/lib/tier";
 import { useSynergyUi, type SortKey } from "@/stores/synergy-ui";
 import { percent, signedRp } from "./format";
 import { PickGroup } from "./pick-badge";
-
-// 등급 농도: S가 가장 진한 VF 보라, D로 갈수록 회색
-const TIER_BADGE: Record<Tier, string> = {
-  S: "bg-tier-s text-white",
-  A: "bg-tier-a text-white",
-  B: "bg-tier-b text-ink",
-  C: "bg-tier-c text-ink",
-  D: "bg-tier-d text-muted",
-};
-
-// 데스크톱은 정사각 배지, 모바일은 행 높이만큼 세로로 긴 띠
-function TierBadge({ tier, tall = false }: { tier: Tier; tall?: boolean }) {
-  return (
-    <span
-      aria-label={`${ tier } 등급`}
-      className={`inline-flex shrink-0 items-center justify-center rounded font-display text-xl leading-none font-extrabold ${
-        tall ? "w-8 self-stretch" : "h-8 w-8"
-      } ${ TIER_BADGE[ tier ] }`}
-    >
-      {tier}
-    </span>
-  );
-}
+import { TierBadge } from "./tier-badge";
 
 // 열 폭을 고정해 두면 행을 더 그리거나 정렬을 바꿔도 열이 흔들리지 않는다.
 // 조합 열만 폭을 정하고, 숫자 열은 남는 폭을 똑같이 나눈다. short는 모바일 지표 제목.
