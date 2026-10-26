@@ -21,6 +21,7 @@
   --font-display: var(--font-shoulders);
 
   --animate-settle: settle 220ms ease-out both;
+  --animate-glitch: glitch 2s ease-in-out infinite;
 
   @keyframes settle {
     from {
@@ -31,6 +32,24 @@
       opacity: 1;
       transform: none;
     }
+  }
+
+  /* 분석 대기 이모티콘: 0.6초 보인 뒤 살짝 두 번 깜빡이며 흐려져 사라지고, 같은 식으로 돌아온다.
+     끊기는 깜빡임(steps)은 눈이 아파 부드러운 보간으로 바꿨다. 번짐(blur)과 1px 이동으로 지지직거리는 느낌만 남긴다. */
+  @keyframes glitch {
+    0%,
+    30% { opacity: 1; filter: none; transform: none; }
+    /* 사라지기 (0.6s~1.04s) */
+    37% { opacity: 0.55; filter: blur(0.5px); transform: translateX(1px); }
+    41% { opacity: 0.85; filter: none; transform: none; }
+    52% { opacity: 0; filter: blur(2px); transform: translateX(-1px); }
+    /* 비어 있음 (1.04s~1.34s) */
+    67% { opacity: 0; filter: blur(2px); transform: none; }
+    /* 나타나기 (1.34s~1.84s) */
+    76% { opacity: 0.6; filter: blur(1px); transform: translateX(1px); }
+    80% { opacity: 0.35; filter: blur(0.5px); transform: none; }
+    92%,
+    100% { opacity: 1; filter: none; transform: none; }
   }
 }
 
@@ -46,7 +65,8 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-settle {
+  .animate-settle,
+  .animate-glitch {
     animation: none;
   }
 }

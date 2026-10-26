@@ -63,16 +63,27 @@ async function* live(key: string | null, stats: ReportStats, signal: AbortSignal
 
 let fixtureTurn = 0;
 
-// 프롬프트 시험용 고정 데이터 목록. "닉네임=경로"는 그 닉네임으로 검색할 때, 경로만 적은 항목과 등록되지 않은 닉네임은 차례로 돌린다.
+// 고정 데이터 목록 "닉네임=경로,경로,…". 경로만 적은 항목은 name이 null이다.
+const parseFixtures = (value: string | undefined) => ( value ?? "" ).split(",").map((e) => e.trim()).filter(Boolean).map((e) => {
+  const at = e.lastIndexOf("=");
+  return at < 0 ? { name: null, path: e } : { name: e.slice(0, at).trim(), path: e.slice(at + 1).trim() };
+});
+
+// 프롬프트 시험용 고정 데이터. "닉네임=경로"는 그 닉네임으로 검색할 때, 경로만 적은 항목과 등록되지 않은 닉네임은 차례로 돌린다.
 // 닉네임은 .env.local(git 제외)에만 적는다. 개발 환경에서만 읽는다.
 function pickFixture(nickname: string): string | null {
   if ( process.env.NODE_ENV !== "development" ) return null;
-  const entries = ( process.env.REPORT_DEV_FIXTURE ?? "" ).split(",").map((e) => e.trim()).filter(Boolean).map((e) => {
-    const at = e.lastIndexOf("=");
-    return at < 0 ? { name: null, path: e } : { name: e.slice(0, at).trim(), path: e.slice(at + 1).trim() };
-  });
+  const entries = parseFixtures(process.env.REPORT_DEV_FIXTURE);
   if ( entries.length === 0 ) return null;
   return entries.find((e) => e.name === nickname)?.path ?? entries[ fixtureTurn++ % entries.length ].path;
+}
+
+// 배포본 체험 모드: 등록된 닉네임만 고정 데이터(demo-fixtures/, git 제외)로 소견을 만든다. ER API를 부르지 않아 수집 중에도 켤 수 있다.
+// 닉네임 매핑은 배포 명령의 환경 변수(REPORT_DEMO_FIXTURE)로만 넘긴다. 켜져 있지 않으면 undefined.
+function pickDemo(nickname: string): { path: string | null } | undefined {
+  const entries = parseFixtures(process.env.REPORT_DEMO_FIXTURE).filter((e) => e.name !== null);
+  if ( entries.length === 0 ) return undefined;
+  return { path: entries.find((e) => e.name === nickname)?.path ?? null };
 }
 
 export async function POST(request: Request) {
@@ -94,6 +105,27 @@ export async function POST(request: Request) {
     }
   }
 
+  const demo = pickDemo(nickname);
+  if ( demo ) {
+    if ( nickname.length === 0 || nickname.length > NICKNAME_MAX ) return fail("invalid", 400);
+    if ( !demo.path ) return fail("demo-only", 404);
+    // 공개 주소라 Claude 호출을 막는 캐시와 IP 제한은 실제 조회와 같이 건다.
+    const key = nicknameKey(nickname);
+    const cached = readCache(key);
+    if ( cached ) return ndjson(replay(cached.stats, cached.advice));
+    const retryAfter = takeRateLimit(clientIp(request.headers));
+    if ( retryAfter > 0 ) return fail("rate-limited", 429, { "Retry-After": String(retryAfter) });
+    try {
+      const stats = JSON.parse(await readFile(demo.path, "utf8")) as ReportStats;
+      return ndjson(live(key, stats, request.signal));
+    } catch (error) {
+      // 경로에는 닉네임이 없다 (demo-fixtures/N.json). 원인 확인용으로 오류 코드만 남긴다.
+      const code = error instanceof Error && "code" in error ? String(error.code) : "";
+      console.warn(`[report] 체험 데이터 읽기 실패: ${ error instanceof Error ? error.name : "unknown" } ${ code }`);
+      return fail("upstream", 500);
+    }
+  }
+
   // 키가 하나라 로컬 수집기를 돌리는 동안에는 배포본에서도 꺼 둔다.
   if ( process.env.REPORT_DISABLED === "1" ) return fail("disabled", 503);
 
@@ -111,11 +143,12 @@ export async function POST(request: Request) {
 
   let stats: ReportStats;
   try {
-    const records = await fetchRecentGames(nickname, request.signal);
-    if ( records === null ) return fail("not-found", 404);
+    const recent = await fetchRecentGames(nickname, request.signal);
+    if ( recent === null ) return fail("not-found", 404);
+    const { records, most } = recent;
     if ( records.length === 0 ) return fail("no-games", 404);
     const teams = await findTeammates(records, request.signal);
-    stats = buildReport(records, teams);
+    stats = buildReport(records, teams, most);
   } catch (error) {
     if ( error instanceof ErApiBusyError ) return fail("busy", 503);
     // 오류 메시지에는 경로가 없다 (er-api/client.ts). 그래도 이름만 남긴다.

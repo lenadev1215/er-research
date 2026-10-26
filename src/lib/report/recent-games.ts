@@ -1,5 +1,5 @@
 import "server-only";
-import { callErApi, type ErApiBody } from "@/lib/er-api/client";
+import { callErApi, ErApiBusyError, type ErApiBody } from "@/lib/er-api/client";
 import { groupWeaponCode } from "@/lib/weapon-groups";
 import type { ReportMode, VisionMetrics } from "./types";
 
@@ -15,6 +15,7 @@ const COBALT_TEAM_MODE = 4;
 
 type UserGameRecord = {
   gameId: number;
+  seasonId: number; // 일반 경기는 0
   matchingMode: number;
   matchingTeamMode: number;
   matchSize: number;
@@ -93,8 +94,40 @@ function toRecord(g: UserGameRecord): RecentRecord {
   };
 }
 
+// 시즌 랭크 통계의 실험체별 집계 (/v2/user/stats, docs/API_NOTES.md). 모스트 3개만 오고 무기 구분이 없다.
+// top3Rate·averageRank는 정수로 잘려 와서 쓰지 않는다.
+export type SeasonCharacterStat = { characterCode: number; totalGames: number; wins: number; top3: number; maxKillings: number };
+
+type UserStatsBody = ErApiBody & {
+  userStats?: { matchingMode: number; matchingTeamMode: number; characterStats?: SeasonCharacterStat[] }[];
+};
+
+const RANK_MODE = 3;
+
+// 랭크 스쿼드 시즌 모스트. 시즌 통계가 없거나 조회에 실패해도 분석은 이어 간다 (빈 배열).
+async function fetchSeasonMost(userId: string, seasonId: number, signal: AbortSignal): Promise<SeasonCharacterStat[]> {
+  try {
+    const body = await callErApi<UserStatsBody>("user-stats", `/v2/user/stats/uid/${ encodeURIComponent(userId) }/${ seasonId }/${ RANK_MODE }`, { signal });
+    const squad = body?.userStats?.find((s) => s.matchingTeamMode === 3);
+    return ( squad?.characterStats ?? [] ).map((c) => ({
+      characterCode: c.characterCode,
+      totalGames: c.totalGames,
+      wins: c.wins,
+      top3: c.top3,
+      maxKillings: c.maxKillings,
+    }));
+  } catch (error) {
+    if ( error instanceof ErApiBusyError || signal.aborted ) throw error;
+    console.warn(`[report] 시즌 통계 조회 실패: ${ error instanceof Error ? error.name : "unknown" }`);
+    return [];
+  }
+}
+
+export type RecentResult = { records: RecentRecord[]; most: SeasonCharacterStat[] };
+
 // 최신 판부터 돌려준다. 닉네임이 없으면 null.
-export async function fetchRecentGames(nickname: string, signal: AbortSignal): Promise<RecentRecord[] | null> {
+// 시즌 모스트는 최근 랭크 판의 시즌으로 조회한다. 최근에 랭크 판이 없으면 조회하지 않는다.
+export async function fetchRecentGames(nickname: string, signal: AbortSignal): Promise<RecentResult | null> {
   const user = await callErApi<ErApiBody & { user: { userId: string } }>(
     "nickname",
     `/v1/user/nickname?query=${ encodeURIComponent(nickname) }`,
@@ -103,6 +136,7 @@ export async function fetchRecentGames(nickname: string, signal: AbortSignal): P
   if ( !user ) return null;
 
   const records: RecentRecord[] = [];
+  let seasonId = 0;
   let next: number | undefined;
   for ( let page = 0; page < MAX_PAGES && records.length < RECENT_COUNT; page++ ) {
     const query = next === undefined ? "" : `?next=${ next }`;
@@ -112,10 +146,13 @@ export async function fetchRecentGames(nickname: string, signal: AbortSignal): P
       { signal },
     );
     for ( const g of body?.userGames ?? [] ) {
-      if ( !isCobalt(g) ) records.push(toRecord(g));
+      if ( isCobalt(g) ) continue;
+      records.push(toRecord(g));
+      if ( g.seasonId > seasonId ) seasonId = g.seasonId;
     }
     next = body?.next;
     if ( next === undefined ) break;
   }
-  return records.slice(0, RECENT_COUNT);
+  const most = seasonId > 0 ? await fetchSeasonMost(user.user.userId, seasonId, signal) : [];
+  return { records: records.slice(0, RECENT_COUNT), most };
 }

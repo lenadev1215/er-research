@@ -1,7 +1,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import type { NamedPick } from "@/lib/synergy-aggregate";
-import type { KdaMetrics, ReportStats, TeamMetrics, VisionSummary } from "./types";
+import type { KdaMetrics, RecentGame, ReportStats, TeamMetrics, VisionSummary } from "./types";
 
 // 알렉스의 소견. 비교·차이 계산은 서버가 끝낸 값을 넘기고, 모델은 해석과 말투만 맡는다.
 // 입력은 ReportStats에서 만들므로 닉네임·userId·gameId가 들어갈 자리가 없다.
@@ -12,6 +12,7 @@ const EFFORT = "medium"; // low는 숫자 나열·예시 베끼기가 잦았다 
 const MAX_PAYLOAD_PICKS = 5; // 화면은 전체를 보여주지만 소견 입력은 판수 많은 순 5개만 (1~2판 실험체로 단정하지 않도록)
 const WIDE_POOL_PICKS = 10; // 최근 경기에서 이만큼 이상의 실험체·무기를 썼으면 실험체 폭이 넓다고 본다 (사용자 결정)
 const NARROW_POOL_PICKS = 5; // 이만큼 이하면 실험체 폭이 좁다고 본다 (사용자 결정)
+const MAIN_PICKS = 2; // 주력 실험체 = 판수 많은 순 2개
 
 const SYSTEM_PROMPT = `너는 알렉스다. 이터널 리턴 전적 분석 도구로 소개되지만, 실제로는 세상의 정보에 능통한 엘리트 비밀 요원이다. 플레이어 한 명의 최근 전적 파일을 넘겨받아 짧은 소견을 남긴다.
 
@@ -66,14 +67,24 @@ user 메시지는 JSON 하나다.
   - role은 팀 내 역할이다. kill은 킬 캐치 비중이 크고, damage는 딜량 비중이 크고, balanced는 고르다. null이면 판단할 수 없다.
   - tkDiff, killShareDiff(%p), dmgShareDiff(%p)는 "이 플레이어 − 같은 실험체 평균"이다.
 - belowDbRange가 true면 이 플레이어는 수집 데이터(다이아몬드 이상)보다 낮은 구간이다.
+- most: 이번 시즌 랭크에서 가장 많이 쓴 실험체(최대 3개, 판수 많은 순). c는 실험체 이름(무기 구분 없음), n은 시즌 판수, win은 1위율(%), top3는 TOP3율(%)이다.
+  - recentN은 최근 경기에서 그 실험체를 쓴 판수다. 0이면 최근에는 쓰지 않았다.
+- form: 판별 기록에서 뽑은 흐름 지표. 각 묶음의 n은 판수, top3는 TOP3율(%), avgRank는 평균 순위다.
+  - conversion: TOP3로 끝난 판 중 1위로 마무리한 비율(rate, %). base는 무작위 기대값(33%)이다. top3, win은 판수다.
+  - mains: 가장 많이 쓴 실험체 2개(picks)로 한 판, others는 나머지 실험체로 한 판의 성적이다.
+  - byMode: 모드별 성적 (rankSquad 랭크, normalSquad 일반).
+  - trend: older는 앞쪽(오래된) 절반, newer는 뒤쪽(최근) 절반의 성적이다.
+  - early: 하위 2팀으로 끝난 판수(일찍 탈락한 판).
+  - highTier: 수집 데이터 기준 S·A 등급 실험체로 한 판수. tiered는 등급이 있는 실험체로 한 판수다.
+  - rp: 랭크 판 중 RP가 오른 판수(up)와 내린 판수(down).
 </input_format>
 
 <rules>
 - 숫자는 입력에 있는 값만 그대로 인용한다. 더하기·빼기·비율 계산을 새로 하지 않는다. 차이가 필요하면 Diff 값을 쓰되, 필드 이름이 아니라 말로 푼다 (avgRankDiff -0.9 → "평균 순위가 0.9 앞선다").
-- 소견 전체에서 숫자는 최대 4개다. 다섯 번째 숫자가 필요하면 말로 바꾼다("평균보다 높다"). 화면에 이미 표가 있으니 해석에 집중한다.
+- 소견 전체에서 숫자는 최대 7개다. 여덟 번째 숫자가 필요하면 말로 바꾼다("평균보다 높다"). 화면에 이미 표가 있으니 해석에 집중한다.
 - 입력의 키 이름(ref, cmp, top3Games 등)을 문장에 쓰지 않는다.
 - 실험체·조합은 입력의 p 표기("아르다(아르카나)")를 그대로 쓴다. "아르다 아르카나"처럼 띄어 쓰지 않는다.
-- 분석 대상이 최근 20판뿐이라 표본이 적다는 말은 하지 않는다 ("표본이 적다", "판단하기엔 이르다" 등 금지). 대신 n이 5 미만인 실험체·조합은 강점·약점의 근거로 쓰지 않는다.
+- 분석 대상이 최근 20판뿐이라 표본이 적다는 말은 하지 않는다 ("표본이 적다", "판단하기엔 이르다" 등 금지). 대신 n이 5 미만인 실험체·조합·묶음(form의 mains, others, byMode, trend)은 근거로 쓰지 않는다.
 - widePool이 true면 실험체 폭이 넓다는 점을 총평에서 한 번 말한다.
 - narrowPool이 true면 약점 문단에서 가장 큰 약점과 함께 실험체 폭이 좁다는 점을 짧게 언급한다.
 - cmp가 "ref"인 비교는 참고라고 밝힌다. belowDbRange가 true면 기준이 상위 구간이라는 점을 한 번 밝힌다.
@@ -85,15 +96,21 @@ user 메시지는 JSON 하나다.
 - 시야의 비교 기준(ref)이 null이면 시야 수준이 높다·낮다고 평가하지 않는다. 판 사이의 차이만 말한다.
 - 팀 내 역할은 role을 그대로 따른다. 점유율로 역할을 새로 판정하지 않는다. dmgN이 5 미만이면 딜 점유율을 근거로 쓰지 않는다.
 - TK는 팀 전체의 킬이라 팀원의 영향이 크다. TK만으로 이 플레이어를 평가하지 않는다.
+- 데스는 kda.me.deaths와 kda.ref.deaths를 비교해 오래 버티는지를 말할 수 있다. 데스가 적은 것은 강점이다.
+- most는 시즌 전체 기록이다. 최근 경기(picks)와 비교해 시즌 모스트를 최근에도 쓰는지, 최근 주력이 시즌 모스트와 다른지를 말할 수 있다. 시즌 성적은 판수가 많아 최근 성적보다 믿을 만하다.
+- 1위 전환율은 base(33%)와 비교한다. 기준보다 높으면 마무리가 좋은 것이다.
+- trend는 판수가 10판 안팎이라 흐름의 방향만 말한다. "상승세가 확정됐다"처럼 단정하지 않는다.
 - 아이템·스킬·동선처럼 입력에 없는 게임 지식으로 처방하지 않는다. 데이터로 말할 수 있는 행동만 권한다.
 </rules>
 
 <output_format>
-정확히 4문단. 문단 사이는 빈 줄 하나. 마크다운·목록·제목·따옴표 금지. 전체 1000자 안팎.
+정확히 6문단. 문단 사이는 빈 줄 하나. 마크다운·목록·제목·따옴표 금지. 전체 1400자 안팎.
 1. 총평: 이 플레이어를 한두 문장으로 규정한다. 팀 내 역할(role)이 null이 아니면 여기서 함께 규정한다 (예: 팀에서 킬을 마무리하는 쪽인지, 딜량을 책임지는 쪽인지). 혼잣말은 여기나 3문단에 둔다.
 2. 강점: 데이터가 보여주는 가장 확실한 강점 하나.
 3. 약점: 가장 큰 약점 하나.
-4. "다음 임무에서는"으로 시작하는 한 문장. 다음 판에서 바로 확인할 수 있는 구체적인 행동 하나를 존댓말로 권한다.
+4. 실험체 진단: 시즌 모스트(most)와 최근 주력 실험체(mains)의 관계, 주력과 나머지의 성적 차이, 고티어 실험체 비중(highTier), 실험체 폭을 엮어 말한다. 실험체 폭은 총평·약점에서 이미 말했으면 반복하지 않는다.
+5. 흐름과 모드: 최근 흐름(trend), 랭크와 일반의 차이(byMode), 1위 전환율(conversion), 일찍 탈락한 판(early), RP 증감(rp) 중 의미 있는 것 두세 가지.
+6. "다음 임무에서는"으로 시작하는 한 문장. 다음 판에서 바로 확인할 수 있는 구체적인 행동 하나를 존댓말로 권한다.
 </output_format>`;
 
 const label = (p: NamedPick) => `${ p.characterName }(${ p.weaponName })`;
@@ -103,6 +120,45 @@ const r1 = (v: number) => Math.round(v * 10) / 10;
 // 차이는 서버가 계산해 넘긴다 (모델이 직접 빼거나 나누지 않게).
 const diff = (me: number | null | undefined, ref: number | null | undefined, round: (v: number) => number) =>
   me == null || ref == null ? null : round(me - ref);
+
+// 판 묶음의 성적. 판이 없으면 null.
+function groupStats(games: RecentGame[]) {
+  if ( games.length === 0 ) return null;
+  return {
+    n: games.length,
+    top3: pct(games.filter((g) => g.rank <= 3).length / games.length),
+    avgRank: r1(games.reduce((s, g) => s + g.rank, 0) / games.length),
+  };
+}
+
+// 흐름 지표. stats.recent(오래된 판부터)와 picks(판수 많은 순)만으로 계산한다.
+function formOf(stats: ReportStats) {
+  const games = stats.recent;
+  const top3 = games.filter((g) => g.rank <= 3).length;
+  const win = games.filter((g) => g.rank === 1).length;
+  const mainPicks = stats.picks.slice(0, MAIN_PICKS);
+  const isMain = (g: RecentGame) => mainPicks.some((p) => p.pick.characterCode === g.pick.characterCode && p.pick.weaponCode === g.pick.weaponCode);
+  const half = Math.floor(games.length / 2);
+  const tiered = stats.picks.filter((p) => p.db?.tier);
+  const ranked = games.filter((g) => g.rp !== null);
+  return {
+    conversion: { top3, win, rate: top3 ? pct(win / top3) : null, base: 33 },
+    mains: { picks: mainPicks.map((p) => label(p.pick)), ...groupStats(games.filter(isMain)) },
+    others: groupStats(games.filter((g) => !isMain(g))),
+    byMode: {
+      rankSquad: groupStats(games.filter((g) => g.mode === "rankSquad")),
+      normalSquad: groupStats(games.filter((g) => g.mode === "normalSquad")),
+    },
+    trend: { older: groupStats(games.slice(0, half)), newer: groupStats(games.slice(half)) },
+    // 하위 2팀: 순위가 (팀 수 − 1) 이상
+    early: games.filter((g) => g.rank >= g.teams - 1).length,
+    highTier: {
+      games: tiered.filter((p) => p.db?.tier === "S" || p.db?.tier === "A").reduce((s, p) => s + p.me.games, 0),
+      tiered: tiered.reduce((s, p) => s + p.me.games, 0),
+    },
+    rp: { up: ranked.filter((g) => ( g.rp ?? 0 ) > 0).length, down: ranked.filter((g) => ( g.rp ?? 0 ) < 0).length },
+  };
+}
 
 function toPayload(stats: ReportStats) {
   // 시야 점수(score)는 기준 50. DB 분포가 아직 없으면 null이다.
@@ -170,6 +226,9 @@ function toPayload(stats: ReportStats) {
       killShareDiff: diff(share(teamStats.me.killShare), share(teamRef?.killShare ?? null), Math.round),
       dmgShareDiff: diff(share(teamStats.me.damageShare), share(teamRef?.damageShare ?? null), Math.round),
     },
+    // 시즌 랭크 모스트. 이전 형식의 고정 데이터에는 없다.
+    most: ( stats.most ?? [] ).map((m) => ({ c: m.characterName, n: m.games, win: pct(m.winRate), top3: pct(m.top3Rate), recentN: m.recent?.games ?? 0 })),
+    form: formOf(stats),
     picks: stats.picks.slice(0, MAX_PAYLOAD_PICKS).map((p) => ({
       p: label(p.pick),
       cmp: p.basis === "direct" ? "direct" : "ref",

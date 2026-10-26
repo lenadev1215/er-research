@@ -6,9 +6,9 @@ import { getSynergy } from "@/lib/synergy";
 import { comboKey, type NamedPick, type Pick, type SynergyCombo } from "@/lib/synergy-aggregate";
 import { assignTiers, type Tier } from "@/lib/tier";
 import { weaponName } from "@/lib/weapon-groups";
-import type { RecentRecord } from "./recent-games";
+import type { RecentRecord, SeasonCharacterStat } from "./recent-games";
 import type { TeamInfo } from "./teammates";
-import type { ComboComparison, DbMetrics, GameImpact, ImpactSummary, KdaMetrics, MyMetrics, PickComparison, RecentGame, ReportStats, ReportTeam, TeamMetrics, VisionMetrics, VisionSummary } from "./types";
+import type { ComboComparison, DbMetrics, GameImpact, ImpactSummary, KdaMetrics, SeasonMost, MyMetrics, PickComparison, RecentGame, ReportStats, ReportTeam, TeamMetrics, VisionMetrics, VisionSummary } from "./types";
 import { loadKdaBaseline, toKda } from "./kda";
 import { loadImpactBaseline, type ImpactBase } from "./impact";
 import { loadTeamBaseline, teamRole, toTeamMetrics } from "./team";
@@ -131,7 +131,7 @@ function groupBy<T>(items: T[], keyOf: (item: T) => string): Map<string, T[]> {
   return map;
 }
 
-export function buildReport(records: RecentRecord[], teams: Map<number, TeamInfo>): ReportStats {
+export function buildReport(records: RecentRecord[], teams: Map<number, TeamInfo>, seasonMost: SeasonCharacterStat[]): ReportStats {
   const characterNames = new Map(db.select().from(characters).all().map((c) => [ c.code, c.name ]));
   const weaponNames = new Map(db.select().from(weapons).all().map((w) => [ w.code, w.name ]));
   const named = (p: Pick): NamedPick => ({
@@ -213,6 +213,27 @@ export function buildReport(records: RecentRecord[], teams: Map<number, TeamInfo
     bus: impacts.filter((v) => v === "bus").length,
   };
 
+  // 시즌 모스트. 딜량·TK는 시즌 통계에 없어 최근 경기에서 같은 실험체(무기 무관)를 쓴 판으로 낸다.
+  const most: SeasonMost[] = seasonMost
+    .filter((c) => c.totalGames > 0)
+    .sort((a, b) => b.totalGames - a.totalGames)
+    .map((c) => {
+      const played = records.filter((r) => r.characterCode === c.characterCode);
+      return {
+        characterCode: c.characterCode,
+        characterName: characterNames.get(c.characterCode) ?? `#${ c.characterCode }`,
+        games: c.totalGames,
+        winRate: c.wins / c.totalGames,
+        top3Rate: c.top3 / c.totalGames,
+        maxKills: c.maxKillings,
+        recent: played.length === 0 ? null : {
+          games: played.length,
+          avgDamage: played.reduce((s, r) => s + r.damage, 0) / played.length,
+          avgTeamKill: played.reduce((s, r) => s + r.teamKill, 0) / played.length,
+        },
+      };
+    });
+
   const recent: RecentGame[] = [ ...records ].map((r, i) => ({
     mode: r.mode,
     rank: r.rank,
@@ -243,6 +264,7 @@ export function buildReport(records: RecentRecord[], teams: Map<number, TeamInfo
     kdaRef: kdaReference(records, kdaOf),
     team: teamSummary(records, teams, loadTeamBaseline()),
     impact,
+    most,
     belowDbRange: latestMmr === null || latestMmr < DB_MMR_MIN,
   };
 }

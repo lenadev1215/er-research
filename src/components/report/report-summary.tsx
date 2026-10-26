@@ -1,5 +1,6 @@
-import type { ImpactSummary, MyMetrics, ReportTeam, ReportVision, TeamRole } from "@/lib/report/types";
+import type { ImpactSummary, MyMetrics, ReportTeam, ReportVision, SeasonMost, TeamRole } from "@/lib/report/types";
 import { damage, percent, signedRp } from "@/components/synergy/format";
+import { SeasonMostList } from "./season-most";
 
 type Metric = { label: string; value: string; note?: string | null };
 
@@ -11,8 +12,10 @@ const ROLE_LABEL: Record<TeamRole, string> = {
 
 // 최근 경기 전체 지표를 한 줄로. RP는 랭크 경기만으로 낸 값이다.
 // 시야 점수는 기준 50이고, 아래에 같은 실험체를 쓴 수집 데이터의 평균을 붙인다.
-// 팀 기여는 둘째 줄. 딜 점유율은 팀 정보가 있는 판으로만 낸다.
-export function ReportSummary({ overall, vision, team, impact }: { overall: MyMetrics; vision: ReportVision; team: ReportTeam | undefined; impact: ImpactSummary | undefined }) {
+// 그 아래 시즌 모스트, 팀 기여 순. 딜 점유율은 팀 정보가 있는 판으로만 낸다.
+type Props = { overall: MyMetrics; vision: ReportVision; team: ReportTeam | undefined; impact: ImpactSummary | undefined; most: SeasonMost[] | undefined };
+
+export function ReportSummary({ overall, vision, team, impact, most }: Props) {
   // 이전 형식으로 저장한 고정 데이터(개발용)에는 score·team이 없을 수 있어 undefined도 없음으로 본다.
   const score = vision.all.score ?? null;
   const refScore = vision.ref?.score ?? null;
@@ -32,6 +35,7 @@ export function ReportSummary({ overall, vision, team, impact }: { overall: MyMe
   return (
     <div className="flex flex-col gap-5">
       <MetricList metrics={metrics} />
+      {most && most.length > 0 && <SeasonMostList most={most} />}
       {team && <TeamRow team={team} impact={impact} />}
     </div>
   );

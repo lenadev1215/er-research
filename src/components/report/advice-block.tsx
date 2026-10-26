@@ -1,3 +1,5 @@
+import { Analyzing } from "./analyzing";
+
 type Props = {
   advice: string;
   streaming: boolean;
@@ -12,9 +14,7 @@ export function AdviceBlock({ advice, streaming, failed }: Props) {
     <section aria-labelledby="advice-heading" className="flex flex-col gap-3 border-l-2 border-vf pl-5">
       <h2 id="advice-heading" className="text-sm font-semibold text-ink">알렉스의 전략 분석</h2>
       <div aria-live="polite" aria-busy={streaming} className="flex flex-col gap-3 text-[15px] leading-7 text-ink">
-        {paragraphs.length === 0 && streaming && (
-          <p role="status" className="text-muted">기록을 읽고 있습니다.</p>
-        )}
+        {paragraphs.length === 0 && streaming && <Analyzing />}
         {paragraphs.map((p, i) => (
           <p key={i}>
             {p}

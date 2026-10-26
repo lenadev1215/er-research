@@ -103,6 +103,18 @@ export type ReportVision = {
   ref: VisionSummary | null; // 내가 쓴 실험체들의 DB 평균을 판수로 가중한 값. 비교할 DB 표본이 없으면 null
 };
 
+// 시즌 랭크 모스트 실험체 (최대 3개, 판수 많은 순). 시즌 통계에는 무기 구분과 딜량·TK가 없다.
+export type SeasonMost = {
+  characterCode: number;
+  characterName: string;
+  games: number;
+  winRate: number;
+  top3Rate: number;
+  maxKills: number;
+  // 최근 경기에서 이 실험체를 쓴 판의 평균. 쓰지 않았으면 null
+  recent: { games: number; avgDamage: number; avgTeamKill: number } | null;
+};
+
 export type ImpactSummary = {
   top3: number; // TOP3로 끝난 판수
   judged: number; // 그중 같은 실험체 평균이 있어 판정한 판수
@@ -119,11 +131,12 @@ export type ReportStats = {
   kdaRef: KdaMetrics | null; // 내가 쓴 실험체들의 DB 평균 KDA를 판수로 가중한 값. DB 표본이 없으면 null
   team: ReportTeam;
   impact: ImpactSummary;
+  most: SeasonMost[]; // 시즌 통계를 받지 못했거나 랭크 기록이 없으면 빈 배열
   belowDbRange: boolean; // MMR이 DB 표본 구간(다이아몬드 이상)보다 낮거나 랭크 기록이 없다
 };
 
 // 스트림 시작 전에 끝나는 오류는 HTTP 상태와 { code }로, 스트림 도중의 오류는 error 이벤트로 온다.
-export type ReportErrorCode = "invalid" | "not-found" | "no-games" | "rate-limited" | "busy" | "disabled" | "upstream" | "advice-failed";
+export type ReportErrorCode = "invalid" | "not-found" | "no-games" | "rate-limited" | "busy" | "disabled" | "demo-only" | "upstream" | "advice-failed";
 
 export type ReportEvent =
   | { type: "stats"; stats: ReportStats }

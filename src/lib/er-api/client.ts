@@ -14,7 +14,7 @@ const MAX_PENDING = 8; // 대기열이 이보다 길면 바로 거절한다 (대
 export type ErApiBody = { code: number; message: string };
 
 // 로그와 오류 메시지에는 경로 대신 이 라벨만 쓴다.
-export type ErApiLabel = "nickname" | "user-games" | "game";
+export type ErApiLabel = "nickname" | "user-games" | "user-stats" | "game";
 
 export class ErApiBusyError extends Error {
   constructor() {

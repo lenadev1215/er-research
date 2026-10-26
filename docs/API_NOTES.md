@@ -21,6 +21,7 @@
 | 닉네임 → 유저 | `GET /v1/user/nickname?query={닉네임}` | `{ user: { nickname, userId } }`. userId는 문자열 |
 | 유저 경기 목록 | `GET /v1/user/games/uid/{userId}` | 10판씩. `next`(gameId)로 다음 페이지 |
 | 경기 상세 | `GET /v1/games/{gameId}` | 참가자 전원. **닉네임만 있고 userId 없음** |
+| 시즌 통계 | `GET /v2/user/stats/uid/{userId}/{seasonId}/{matchingMode}` | `userStats[]`. 실험체별 집계 `characterStats` 포함. 2026-10-26 확인 |
 
 - `/v1/user/games/{userId}`(uid 없는 경로)는 body `code: 401`을 돌려준다. `uid` 경로를 쓴다.
 - 현재 시즌 ID: **41** (2026-10-25 기준). `rank/top/42/3`부터 404.
@@ -84,6 +85,16 @@ rank/top → 닉네임
 - `addSurveillanceCamera`(감시 카메라)는 최근 10판 모두 0이었다. 지금 시즌에는 쓰이지 않는 것으로 보고 수집하지 않는다.
 - `killDetail`, `killer`, `killDetail2` 등 킬·데스 상세 문자열 필드에는 **다른 플레이어 닉네임**이 들어 있다. 읽지도 저장하지도 않는다.
 - 시야 지표 4개는 팀 순위와 상관이 강하다(랭크 5판 120명 기준 −0.59~−0.80). 오래 살아남을수록 쌓이는 값이라 생존 시간의 영향이 섞여 있다.
+
+## 시즌 통계 (2026-10-26, 한 유저로 확인)
+
+- `matchingMode` 3(랭크)만 값이 있다. 2(일반)는 `userStats`가 비어 있다.
+- `characterStats`는 **모스트 3개만** 온다 (54판 유저도 3개). **무기 구분이 없다.**
+  - 필드: `characterCode, totalGames, usages, wins, top3, maxKillings, top3Rate, averageRank, mostUsedSkinCode, latestUsedSkinCode`
+  - `top3Rate`·`averageRank`는 **정수로 잘려** 온다 (0, 1 등). `top3 / totalGames`로 직접 계산한다.
+  - 실험체별 딜량·TK는 없다.
+- 랭크 응답(`userStats` 항목)에는 `nickname` 필드가 없었다. 다른 응답에는 있을 수 있으니 읽지 않는다.
+- 엔드포인트는 공식 문서가 아니라 서드파티 래퍼(bserpy) 소스에서 찾았다.
 
 ## 메타 주의사항
 

@@ -5,6 +5,7 @@ import { INITIAL_REPORT, ReportError, reduceReport, streamReport, type ReportSta
 import type { ReportErrorCode } from "@/lib/report/types";
 import { useReportUi } from "@/stores/report-ui";
 import { AdviceBlock } from "@/components/report/advice-block";
+import { Analyzing } from "@/components/report/analyzing";
 import { ComboCompare } from "@/components/report/combo-compare";
 import { NicknameForm } from "@/components/report/nickname-form";
 import { PickCompare } from "@/components/report/pick-compare";
@@ -18,6 +19,7 @@ const ERROR_MESSAGE: Record<ReportErrorCode, string> = {
   "rate-limited": "분석 요청이 너무 잦습니다. 몇 분 뒤에 다시 시도하세요.",
   "busy": "지금 다른 분석이 진행 중입니다. 잠시 뒤에 다시 시도하세요.",
   "disabled": "지금은 전적 분석을 쓸 수 없습니다. 데이터를 수집하는 동안에는 꺼 둡니다.",
+  "demo-only": "지금은 체험용으로 등록된 닉네임만 분석할 수 있습니다.",
   "upstream": "전적 서버에서 응답을 받지 못했습니다. 잠시 뒤에 다시 시도하세요.",
   "advice-failed": "소견을 만들지 못했습니다.",
 };
@@ -77,7 +79,7 @@ function Result({ isPending, errorCode, data, streaming }: ResultProps) {
     return <p className="rounded-md bg-surface px-5 py-8 text-sm text-muted">{ERROR_MESSAGE[ errorCode ]} 일반·랭크 경기를 한 판 이상 치른 뒤 다시 분석하세요.</p>;
   }
   if ( errorCode ) return <p role="alert" className="text-sm text-alert">{ERROR_MESSAGE[ errorCode ]}</p>;
-  if ( isPending || !data?.stats ) return <p role="status" className="text-sm text-muted">최근 경기를 조회하는 중입니다.</p>;
+  if ( isPending || !data?.stats ) return <Analyzing />;
 
   const { stats } = data;
   return (
@@ -85,7 +87,7 @@ function Result({ isPending, errorCode, data, streaming }: ResultProps) {
       <section aria-labelledby="recent-heading" className="flex flex-col gap-5">
         <h2 id="recent-heading" className="text-sm font-semibold text-ink">최근 {stats.recent.length}판</h2>
         <RecentStrip games={stats.recent} />
-        <ReportSummary overall={stats.overall} vision={stats.vision} team={stats.team} impact={stats.impact} />
+        <ReportSummary overall={stats.overall} vision={stats.vision} team={stats.team} impact={stats.impact} most={stats.most} />
         {stats.belowDbRange && (
           <p className="text-xs text-muted">수집 데이터는 다이아몬드 이상 랭크 경기 기준입니다. 비교 수치는 참고로 보세요.</p>
         )}
