@@ -87,7 +87,7 @@ function Result({ isPending, errorCode, data, streaming }: ResultProps) {
       <section aria-labelledby="recent-heading" className="flex flex-col gap-5">
         <h2 id="recent-heading" className="text-sm font-semibold text-ink">최근 {stats.recent.length}판</h2>
         <RecentStrip games={stats.recent} />
-        <ReportSummary overall={stats.overall} vision={stats.vision} team={stats.team} impact={stats.impact} most={stats.most} />
+        <ReportSummary overall={stats.overall} vision={stats.vision} team={stats.team} impact={stats.impact} most={stats.most} playstyle={stats.playstyle} />
         {stats.belowDbRange && (
           <p className="text-xs text-muted">수집 데이터는 다이아몬드 이상 랭크 경기 기준입니다. 비교 수치는 참고로 보세요.</p>
         )}

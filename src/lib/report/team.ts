@@ -10,7 +10,9 @@ import type { TeamMetrics, TeamRole } from "./types";
 // 딜 점유율은 팀원 딜량이 필요해 팀 정보가 있는 판(DB 랭크 판, 상세 조회한 판)으로만 낸다.
 
 const PICK_MIN_ROWS = 20; // 실험체·무기별 DB 평균의 최소 표본 (실험체 티어와 같은 기준)
-const ROLE_MARGIN = 0.05; // 킬 쪽·딜 쪽 우위가 이 폭(5%p)보다 작으면 균형으로 본다
+const TEAM_SHARE = 1 / 3; // 3인 팀이 고르게 나눴을 때의 점유율
+const DAMAGE_MARGIN = 0.03; // 딜 점유율이 같은 실험체 평균보다 이 폭(3%p) 이상 높으면 딜 담당 (사용자 결정)
+const KILL_MARGIN = 0.05; // 킬 점유율이 이 폭(5%p) 이상 높으면 킬 캐치 (사용자 결정)
 
 export type TeamSample = { kills: number; assists: number; teamKill: number; damage: number; teamDamage: number | null };
 
@@ -31,15 +33,16 @@ export function toTeamMetrics(samples: TeamSample[]): TeamMetrics | null {
   };
 }
 
-// 킬 점유율과 딜 점유율 중 어느 쪽이 더 높은지. 기준(ref)이 있으면 같은 실험체 평균 대비 우위끼리 비교한다
-// (딜러 실험체는 둘 다 높게 나오므로). 기준이 없으면 두 점유율을 그대로 비교한다.
+// 딜 점유율이 높으면 킬과 상관없이 딜 담당, 아니고 킬 점유율이 높으면 킬 캐치, 둘 다 아니면 균형 (사용자 결정).
+// 기준(ref)이 있으면 같은 실험체 평균 대비 우위로 본다 (딜러 실험체는 둘 다 높게 나오므로).
+// 기준이 없으면 3인 팀 기준선(1/3)과 비교한다.
 export function teamRole(me: TeamMetrics, ref: TeamMetrics | null): TeamRole | null {
   if ( me.killShare === null || me.damageShare === null ) return null;
   const useRef = ref?.killShare != null && ref.damageShare != null;
-  const killEdge = me.killShare - ( useRef ? ref.killShare ?? 0 : 0 );
-  const damageEdge = me.damageShare - ( useRef ? ref.damageShare ?? 0 : 0 );
-  if ( killEdge - damageEdge > ROLE_MARGIN ) return "kill";
-  if ( damageEdge - killEdge > ROLE_MARGIN ) return "damage";
+  const killEdge = me.killShare - ( useRef ? ref.killShare ?? 0 : TEAM_SHARE );
+  const damageEdge = me.damageShare - ( useRef ? ref.damageShare ?? 0 : TEAM_SHARE );
+  if ( damageEdge >= DAMAGE_MARGIN ) return "damage";
+  if ( killEdge >= KILL_MARGIN ) return "kill";
   return "balanced";
 }
 

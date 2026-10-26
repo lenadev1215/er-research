@@ -8,7 +8,7 @@ import { assignTiers, type Tier } from "@/lib/tier";
 import { weaponName } from "@/lib/weapon-groups";
 import type { RecentRecord, SeasonCharacterStat } from "./recent-games";
 import type { TeamInfo } from "./teammates";
-import type { ComboComparison, DbMetrics, GameImpact, ImpactSummary, KdaMetrics, SeasonMost, MyMetrics, PickComparison, RecentGame, ReportStats, ReportTeam, TeamMetrics, VisionMetrics, VisionSummary } from "./types";
+import type { ComboComparison, DbMetrics, GameImpact, ImpactSummary, KdaMetrics, Playstyle, SeasonMost, MyMetrics, PickComparison, RecentGame, ReportStats, ReportTeam, TeamMetrics, VisionMetrics, VisionSummary } from "./types";
 import { loadKdaBaseline, toKda } from "./kda";
 import { loadImpactBaseline, type ImpactBase } from "./impact";
 import { loadTeamBaseline, teamRole, toTeamMetrics } from "./team";
@@ -20,6 +20,8 @@ const MAX_COMBOS = 5;
 const COMBO_MIN_GAMES = 10; // 이보다 적은 DB 조합은 등급을 비교하지 않는다 (화면 기본값 1판과 별개)
 const DB_MMR_MIN = 5000; // 수집 대상 하한 (scripts/collect.mts DIAMOND_MIN)
 
+const VISION_EDGE = 5; // TOP3 판 시야 점수가 같은 실험체 TOP3 판 평균보다 이만큼 높으면 시야 장악 (사용자 결정, 50±15 척도)
+const PLAYSTYLE_MIN_TOP3 = 3; // TOP3 판이 이보다 적으면 시야 뱃지를 판정하지 않는다
 const CARRY_RATIO = 1.3; // 딜량과 KDA가 모두 같은 실험체의 TOP3 판 평균의 이 배수 이상이면 캐리 (사용자 결정, DB TOP3 판의 약 8%)
 const BUS_RATIO = 0.7; // 둘 다 이 배수 이하면 버스 (DB TOP3 판의 약 16%)
 
@@ -54,9 +56,9 @@ function visionAverage(games: RecentRecord[]): VisionMetrics | null {
 const withScore = (v: VisionMetrics | null, vision: VisionBaseline): VisionSummary | null => v && { ...v, score: vision.score(v) };
 
 // 내가 쓴 판마다 그 실험체·무기의 DB 평균을 가져와 판수로 가중한다. DB 표본이 없는 판은 뺀다.
-function visionReference(records: RecentRecord[], vision: VisionBaseline): VisionMetrics | null {
+function visionReference(records: RecentRecord[], pickOf: VisionBaseline[ "pick" ]): VisionMetrics | null {
   const refs = records.flatMap((r) => {
-    const v = vision.pick(r.characterCode, r.weaponCode);
+    const v = pickOf(r.characterCode, r.weaponCode);
     return v ? [ v ] : [];
   });
   if ( refs.length === 0 ) return null;
@@ -120,6 +122,13 @@ function gameImpact(r: RecentRecord, base: ImpactBase): GameImpact | null | unde
   if ( ratios.every((v) => v >= CARRY_RATIO) ) return "carry";
   if ( ratios.every((v) => v <= BUS_RATIO) ) return "bus";
   return null;
+}
+
+// 시야 뱃지. TOP3 판끼리 비교해 생존 시간의 영향을 덜어 낸다. 데스는 전체 판 평균을 같은 실험체 평균과 비교한다.
+function playstyleOf(top3Games: number, top3: VisionSummary | null, top3Ref: VisionSummary | null, deaths: number, refDeaths: number | null): Playstyle | null {
+  if ( top3Games < PLAYSTYLE_MIN_TOP3 || top3?.score == null || top3Ref?.score == null ) return null;
+  if ( top3.score - top3Ref.score < VISION_EDGE ) return null;
+  return refDeaths !== null && deaths < refDeaths ? "survivor" : "vision";
 }
 
 function groupBy<T>(items: T[], keyOf: (item: T) => string): Map<string, T[]> {
@@ -247,21 +256,29 @@ export function buildReport(records: RecentRecord[], teams: Map<number, TeamInfo
   const top3 = records.filter((r) => r.rank <= 3);
   const rest = records.filter((r) => r.rank > 3);
 
+  const overall = myMetrics(records, vision);
+  const visionRef = withScore(visionReference(records, vision.pick), vision);
+  const visionTop3 = withScore(visionAverage(top3), vision);
+  const visionTop3Ref = withScore(visionReference(top3, vision.pickTop3), vision);
+  const kdaRef = kdaReference(records, kdaOf);
+
   const latestMmr = records.find((r) => r.mmrBefore !== null)?.mmrBefore ?? null;
 
   return {
     recent,
-    overall: myMetrics(records, vision),
+    overall,
     picks,
     combos,
     vision: {
       // records는 비어 있지 않으므로 전체 평균은 항상 있다.
       all: withScore(visionAverage(records), vision) ?? { view: 0, cam: 0, camRemove: 0, drone: 0, score: null },
-      top3: { games: top3.length, metrics: withScore(visionAverage(top3), vision) },
+      top3: { games: top3.length, metrics: visionTop3 },
       rest: { games: rest.length, metrics: withScore(visionAverage(rest), vision) },
-      ref: withScore(visionReference(records, vision), vision),
+      ref: visionRef,
+      top3Ref: visionTop3Ref,
     },
-    kdaRef: kdaReference(records, kdaOf),
+    kdaRef,
+    playstyle: playstyleOf(top3.length, visionTop3, visionTop3Ref, overall.kda.deaths, kdaRef?.deaths ?? null),
     team: teamSummary(records, teams, loadTeamBaseline()),
     impact,
     most,

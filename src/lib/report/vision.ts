@@ -20,6 +20,9 @@ type Norm = { mean: number; sd: number };
 export type VisionBaseline = {
   score: (v: VisionMetrics) => number | null; // 분포가 아직 없으면 null
   pick: (characterCode: number, weaponCode: number) => VisionMetrics | null; // 표본 부족이면 null
+  // TOP3로 끝난 판만의 평균. 시야는 생존 시간에 따라 쌓여 TOP3 판끼리 비교해야 공정하다 (시야 장악·생존왕 뱃지).
+  // TOP3 표본이 부족하면 전체 평균에 DB 전체의 TOP3 배율을 곱한다 (lib/report/impact.ts와 같은 방식).
+  pickTop3: (characterCode: number, weaponCode: number) => VisionMetrics | null;
 };
 
 const columns = {
@@ -59,10 +62,12 @@ export function loadVisionBaseline(): VisionBaseline {
     : null;
 
   const weapon = groupedWeapon(participants);
+  const top3 = sql<number>`case when ${ participants.gameRank } <= 3 then 1 else 0 end`;
   const rows = db
     .select({
       characterCode: participants.characterCode,
       weaponCode: weapon,
+      top3,
       rows: sql<number>`count(*)`,
       view: sql<number>`avg(${ columns.view })`,
       cam: sql<number>`avg(${ columns.cam })`,
@@ -71,11 +76,38 @@ export function loadVisionBaseline(): VisionBaseline {
     })
     .from(participants)
     .where(filled)
-    .groupBy(participants.characterCode, weapon)
+    .groupBy(participants.characterCode, weapon, top3)
     .all();
-  const byPick = new Map(rows
-    .filter((r) => r.rows >= PICK_MIN_ROWS)
-    .map((r) => [ `${ r.characterCode }:${ r.weaponCode }`, { view: r.view, cam: r.cam, camRemove: r.camRemove, drone: r.drone } ]));
+
+  type Row = ( typeof rows )[ number ];
+  // 판수로 가중한 평균
+  const merge = (rs: Row[]): VisionMetrics & { rows: number } => {
+    const n = rs.reduce((acc, r) => acc + r.rows, 0);
+    const avg = (k: ( typeof KEYS )[ number ]) => ( n ? rs.reduce((acc, r) => acc + r[ k ] * r.rows, 0) / n : 0 );
+    return { rows: n, view: avg("view"), cam: avg("cam"), camRemove: avg("camRemove"), drone: avg("drone") };
+  };
+  const strip = ({ view, cam, camRemove, drone }: VisionMetrics): VisionMetrics => ({ view, cam, camRemove, drone });
+
+  const all = merge(rows);
+  const allTop3 = merge(rows.filter((r) => r.top3 === 1));
+  const factor = (k: ( typeof KEYS )[ number ]) => ( all[ k ] ? allTop3[ k ] / all[ k ] : 1 );
+
+  const groups = new Map<string, Row[]>();
+  for ( const r of rows ) {
+    const k = `${ r.characterCode }:${ r.weaponCode }`;
+    groups.set(k, [ ...( groups.get(k) ?? [] ), r ]);
+  }
+  const byPick = new Map<string, VisionMetrics>();
+  const byPickTop3 = new Map<string, VisionMetrics>();
+  for ( const [ k, rs ] of groups ) {
+    const merged = merge(rs);
+    if ( merged.rows < PICK_MIN_ROWS ) continue;
+    byPick.set(k, strip(merged));
+    const t = merge(rs.filter((r) => r.top3 === 1));
+    byPickTop3.set(k, t.rows >= PICK_MIN_ROWS
+      ? strip(t)
+      : { view: merged.view * factor("view"), cam: merged.cam * factor("cam"), camRemove: merged.camRemove * factor("camRemove"), drone: merged.drone * factor("drone") });
+  }
 
   return {
     score: (v) => {
@@ -85,5 +117,6 @@ export function loadVisionBaseline(): VisionBaseline {
       return 50 + 15 * ( z.reduce((s, x) => s + x, 0) / z.length );
     },
     pick: (characterCode, weaponCode) => byPick.get(`${ characterCode }:${ weaponCode }`) ?? null,
+    pickTop3: (characterCode, weaponCode) => byPickTop3.get(`${ characterCode }:${ weaponCode }`) ?? null,
   };
 }

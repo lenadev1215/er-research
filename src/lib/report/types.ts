@@ -101,7 +101,12 @@ export type ReportVision = {
   top3: { games: number; metrics: VisionSummary | null }; // TOP3로 끝난 판
   rest: { games: number; metrics: VisionSummary | null }; // 그 밖의 판
   ref: VisionSummary | null; // 내가 쓴 실험체들의 DB 평균을 판수로 가중한 값. 비교할 DB 표본이 없으면 null
+  top3Ref: VisionSummary | null; // 내 TOP3 판의 실험체들이 TOP3로 끝난 판의 DB 평균 (top3와 비교한다)
 };
+
+// 팀 내 역할과 별개인 플레이 스타일 뱃지 (lib/report/compare.ts playstyleOf).
+// vision: TOP3 판 시야 점수가 같은 실험체의 TOP3 판 평균보다 높다. survivor: 그러면서 데스도 같은 실험체 평균보다 적다.
+export type Playstyle = "vision" | "survivor";
 
 // 시즌 랭크 모스트 실험체 (최대 3개, 판수 많은 순). 시즌 통계에는 무기 구분과 딜량·TK가 없다.
 export type SeasonMost = {
@@ -131,6 +136,7 @@ export type ReportStats = {
   kdaRef: KdaMetrics | null; // 내가 쓴 실험체들의 DB 평균 KDA를 판수로 가중한 값. DB 표본이 없으면 null
   team: ReportTeam;
   impact: ImpactSummary;
+  playstyle: Playstyle | null;
   most: SeasonMost[]; // 시즌 통계를 받지 못했거나 랭크 기록이 없으면 빈 배열
   belowDbRange: boolean; // MMR이 DB 표본 구간(다이아몬드 이상)보다 낮거나 랭크 기록이 없다
 };

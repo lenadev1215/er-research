@@ -64,9 +64,11 @@ user 메시지는 JSON 하나다.
   - bus는 딜량과 KDA가 모두 같은 실험체의 TOP3 판 평균의 0.7배 이하였던 판수(팀원 덕에 TOP3에 오른 판, 버스를 탄 판)다.
 - team: 팀 기여. tk 판당 평균 팀 킬(TK), killShare 킬 점유율(내 킬 ÷ TK, %), involvement 킬 관여율((킬 + 어시스트) ÷ TK, %), dmgShare 딜 점유율(내 딜량 ÷ 팀 딜량, %). 3인 팀이라 점유율 기준선은 33%다.
   - dmgN은 딜 점유율을 낸 판수다(팀 정보가 있는 랭크 판만).
-  - role은 팀 내 역할이다. kill은 킬 캐치 비중이 크고, damage는 딜량 비중이 크고, balanced는 고르다. null이면 판단할 수 없다.
+  - role은 팀 내 역할이다. damage는 딜 점유율이 같은 실험체 평균보다 크게 높다(킬과 무관). kill은 딜 점유율은 높지 않은데 킬 점유율이 크게 높다. balanced는 둘 다 아니다. null이면 판단할 수 없다.
   - tkDiff, killShareDiff(%p), dmgShareDiff(%p)는 "이 플레이어 − 같은 실험체 평균"이다.
 - belowDbRange가 true면 이 플레이어는 수집 데이터(다이아몬드 이상)보다 낮은 구간이다.
+- playstyle: 시야 뱃지. vision은 TOP3 판의 시야 점수가 같은 실험체의 TOP3 판 평균보다 5점 이상 높다(시야 장악). survivor는 그러면서 데스도 같은 실험체 평균보다 적다(생존왕). null이면 뱃지가 없다.
+  - vision.top3ScoreDiff는 TOP3 판끼리 비교한 시야 점수 차이다. 시야를 평가할 때는 scoreDiff보다 이 값을 우선한다.
 - most: 이번 시즌 랭크에서 가장 많이 쓴 실험체(최대 3개, 판수 많은 순). c는 실험체 이름(무기 구분 없음), n은 시즌 판수, win은 1위율(%), top3는 TOP3율(%)이다.
   - recentN은 최근 경기에서 그 실험체를 쓴 판수다. 0이면 최근에는 쓰지 않았다.
 - form: 판별 기록에서 뽑은 흐름 지표. 각 묶음의 n은 판수, top3는 TOP3율(%), avgRank는 평균 순위다.
@@ -93,6 +95,7 @@ user 메시지는 JSON 하나다.
 - 딜량(dmg, dmgDiff, dmgShare)이 낮은 것은 약점으로 쓰지 않는다. 탱커처럼 딜량이 낮게 나오는 역할이 있다. 딜량이 높은 것은 강점으로 써도 된다.
 - 1위율과 TOP3율은 winBase, top3Base와 비교해 평가한다. 이 게임에서 1위율 25%는 기준의 두 배 가까운 높은 값이다. 50%를 기준으로 낮다고 말하지 않는다.
 - 시야 지표는 오래 살아남을수록 쌓이는 값이다. 순위가 낮은 판의 시야가 낮은 것은 일찍 탈락한 결과일 수도 있다. 원인을 단정하지 말고 TOP3 판과 그 밖의 판의 차이를 근거로 말한다.
+- playstyle이 있으면 강점 문단에서 그 뱃지("시야 장악", "생존왕")의 의미를 한 번 말한다.
 - 시야의 비교 기준(ref)이 null이면 시야 수준이 높다·낮다고 평가하지 않는다. 판 사이의 차이만 말한다.
 - 팀 내 역할은 role을 그대로 따른다. 점유율로 역할을 새로 판정하지 않는다. dmgN이 5 미만이면 딜 점유율을 근거로 쓰지 않는다.
 - TK는 팀 전체의 킬이라 팀원의 영향이 크다. TK만으로 이 플레이어를 평가하지 않는다.
@@ -213,6 +216,8 @@ function toPayload(stats: ReportStats) {
       // 같은 실험체를 쓴 수집 데이터의 평균 (내 판수로 가중). 표본이 없으면 null
       ref: visionRef && vision(visionRef),
       scoreDiff: diff(stats.vision.all.score, visionRef?.score, Math.round),
+      // TOP3 판끼리 비교한 시야 점수 차이 (이 플레이어의 TOP3 판 − 같은 실험체의 TOP3 판 평균)
+      top3ScoreDiff: diff(stats.vision.top3.metrics?.score, stats.vision.top3Ref?.score, Math.round),
     },
     // KDA = (킬 + 어시스트) / 데스. ref는 같은 실험체를 쓴 수집 데이터의 평균 (내 판수로 가중)
     kda: {
@@ -221,6 +226,7 @@ function toPayload(stats: ReportStats) {
       kdaDiff: diff(stats.overall.kda.kda, kdaRef?.kda, r1),
     },
     impact: stats.impact ?? null,
+    playstyle: stats.playstyle ?? null,
     // 팀 기여. ref는 같은 실험체를 쓴 수집 데이터의 평균 (내 판수로 가중). dmgN은 딜 점유율을 낸 판수
     team: teamStats && {
       me: { ...team(teamStats.me), dmgN: teamStats.me.damageGames },
