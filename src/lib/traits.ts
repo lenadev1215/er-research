@@ -2,6 +2,7 @@ import "server-only";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { participants, traits } from "@/db/schema";
+import { groupedWeapon } from "./weapon-groups";
 
 export type TraitShare = { code: number; name: string; games: number; share: number };
 
@@ -15,7 +16,7 @@ export function getCoreTraitShares(characterCode: number, weaponCode: number): T
     })
     .from(participants)
     .leftJoin(traits, eq(traits.code, participants.coreTraitCode))
-    .where(and(eq(participants.characterCode, characterCode), eq(participants.weaponCode, weaponCode)))
+    .where(and(eq(participants.characterCode, characterCode), eq(groupedWeapon(participants), weaponCode)))
     .groupBy(participants.coreTraitCode)
     .all();
 

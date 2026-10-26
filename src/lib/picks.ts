@@ -2,6 +2,7 @@ import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { characters, participants, weapons } from "@/db/schema";
+import { groupedWeapon, weaponName } from "./weapon-groups";
 
 export type PickOption = {
   code: number;
@@ -12,19 +13,19 @@ export type PickOption = {
 
 // 수집 데이터에 실제로 등장한 실험체와 무기만 선택지로 낸다.
 export function getPicks(): PickOption[] {
+  const weapon = groupedWeapon(participants);
   const rows = db
     .select({
       characterCode: participants.characterCode,
       characterName: characters.name,
-      weaponCode: participants.weaponCode,
-      weaponName: weapons.name,
+      weaponCode: weapon,
       games: sql<number>`count(*)`,
     })
     .from(participants)
     .leftJoin(characters, eq(characters.code, participants.characterCode))
-    .leftJoin(weapons, eq(weapons.code, participants.weaponCode))
-    .groupBy(participants.characterCode, participants.weaponCode)
+    .groupBy(participants.characterCode, weapon)
     .all();
+  const weaponNames = new Map(db.select().from(weapons).all().map((w) => [ w.code, w.name ]));
 
   const byCharacter = new Map<number, PickOption>();
   for ( const r of rows ) {
@@ -35,7 +36,7 @@ export function getPicks(): PickOption[] {
       weapons: [],
     };
     pick.games += r.games;
-    pick.weapons.push({ code: r.weaponCode, name: r.weaponName ?? `#${ r.weaponCode }`, games: r.games });
+    pick.weapons.push({ code: r.weaponCode, name: weaponName(r.weaponCode, weaponNames), games: r.games });
     byCharacter.set(r.characterCode, pick);
   }
 
