@@ -40,15 +40,23 @@ export const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve
 // HTTP 200이어도 body code가 401/404일 수 있어 body 기준으로 판단한다.
 export async function callApi<T extends ApiBody>(path: string): Promise<T | null> {
   for ( let attempt = 0; attempt < MAX_RETRIES; attempt++ ) {
-    const res = await fetch(`${ API_BASE }${ path }`, { headers: { "x-api-key": API_KEY! } });
+    // 타임아웃·연결 끊김 같은 네트워크 오류도 429처럼 기다렸다가 다시 시도한다 (몇 시간 도는 수집이 한 번에 죽지 않게).
+    const res = await fetch(`${ API_BASE }${ path }`, { headers: { "x-api-key": API_KEY! } }).catch((error: unknown) => error);
     await sleep(REQUEST_INTERVAL_MS);
+    if ( !( res instanceof Response ) ) {
+      const wait = 2 ** attempt * 2000;
+      console.warn(`  네트워크 오류(${ res instanceof Error ? res.message : String(res) }), ${ wait / 1000 }초 후 재시도: ${ path }`);
+      await sleep(wait);
+      continue;
+    }
 
     const body = (await res.json().catch(() => null)) as T | null;
     const code = body?.code ?? res.status;
 
     if ( code === 200 && body ) return body;
     if ( code === 404 ) return null;
-    if ( code === 429 || res.status === 429 || res.status >= 500 ) {
+    // 본문이 JSON으로 읽히지 않으면(응답이 중간에 끊긴 경우 등) HTTP 200이어도 다시 시도한다.
+    if ( !body || code === 429 || res.status === 429 || res.status >= 500 ) {
       const wait = 2 ** attempt * 2000;
       console.warn(`  ${ code } 응답, ${ wait / 1000 }초 후 재시도: ${ path }`);
       await sleep(wait);
