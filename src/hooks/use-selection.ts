@@ -49,5 +49,13 @@ export function useSelection() {
     router.push(`${ pathname }?${ out }`, { scroll: false });
   }, [ pathname, router ]);
 
-  return { selection, setSelection };
+  // 쿼리가 없는 처음 주소로 돌아간다. 뒤로 가기로 초기화 전 선택에 돌아갈 수 있다.
+  const resetSelection = useCallback(() => router.push(pathname, { scroll: false }), [ pathname, router ]);
+
+  const isDefault = selection.characterCode === DEFAULT_CHARACTER &&
+    selection.weaponCode === DEFAULT_WEAPON &&
+    selection.coreTraitCode === null &&
+    selection.allies.every((ally) => ally === null);
+
+  return { selection, setSelection, resetSelection, isDefault };
 }

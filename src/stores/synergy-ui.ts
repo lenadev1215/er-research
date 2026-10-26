@@ -10,20 +10,34 @@ export type SortDir = "asc" | "desc";
 const defaultDir = (key: SortKey): SortDir => (key === "avgRank" ? "asc" : "desc");
 
 // 실험체·무기·특성 선택은 URL이 맡는다 (hooks/use-selection.ts).
-type SynergyUiState = {
+type ViewState = {
   criterion: Criterion;
   minGames: number;
   sort: { key: SortKey; dir: SortDir };
+};
+
+export const DEFAULT_VIEW: ViewState = {
+  criterion: "overall",
+  minGames: 1, // 표본 확보 전 임시값. 기획 기본값은 30판
+  sort: { key: "score", dir: "desc" },
+};
+
+export const isDefaultView = ({ criterion, minGames, sort }: ViewState) =>
+  criterion === DEFAULT_VIEW.criterion &&
+  minGames === DEFAULT_VIEW.minGames &&
+  sort.key === DEFAULT_VIEW.sort.key &&
+  sort.dir === DEFAULT_VIEW.sort.dir;
+
+type SynergyUiState = ViewState & {
   setCriterion: (criterion: Criterion) => void;
   setMinGames: (minGames: number) => void;
   toggleSort: (key: SortKey) => void;
   setSortKey: (key: SortKey) => void; // 모바일 정렬 선택 상자용. 방향은 지표별 기본값
+  resetView: () => void;
 };
 
 export const useSynergyUi = create<SynergyUiState>()((set) => ({
-  criterion: "overall",
-  minGames: 1, // 표본 확보 전 임시값. 기획 기본값은 30판
-  sort: { key: "score", dir: "desc" },
+  ...DEFAULT_VIEW,
   // 기준을 바꾸면 그 기준 점수 순으로 다시 보여준다.
   setCriterion: (criterion) => set({ criterion, sort: { key: "score", dir: "desc" } }),
   setMinGames: (minGames) => set({ minGames }),
@@ -33,4 +47,5 @@ export const useSynergyUi = create<SynergyUiState>()((set) => ({
       ? { key, dir: sort.dir === "asc" ? "desc" : "asc" }
       : { key, dir: defaultDir(key) },
   })),
+  resetView: () => set(DEFAULT_VIEW),
 }));

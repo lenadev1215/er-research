@@ -11,6 +11,7 @@ import { ComboTable } from "@/components/synergy/combo-table";
 import { CriterionControls } from "@/components/synergy/criterion-controls";
 import { pickLabel } from "@/components/synergy/format";
 import { PickTierSummary } from "@/components/synergy/pick-tier-summary";
+import { ResetButton } from "@/components/synergy/reset-button";
 import { SynergySummary } from "@/components/synergy/synergy-summary";
 import { TeammateSlot } from "@/components/synergy/teammate-slot";
 import { TraitSelect } from "@/components/synergy/trait-select";
@@ -49,10 +50,13 @@ export function SynergyView() {
         <h1 className="sr-only">
           {data ? [ data.me.characterName, data.me.weaponName, data.me.coreTraitName ].filter(Boolean).join(" / ") : "팀원 조합"}
         </h1>
-        {/* 넓은 화면에서는 실험체 이름 오른쪽에, 좁은 화면에서는 아래에 실험체 티어를 둔다. */}
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-8">
+        {/* 넓은 화면: 이름 | 실험체 티어 | 초기화(오른쪽 끝). 좁은 화면: 이름과 초기화가 한 줄, 실험체 티어는 아래 줄. */}
+        <div className="flex flex-wrap items-center gap-3 lg:flex-nowrap lg:gap-8">
           <CharacterPicker />
-          <PickTierSummary />
+          <ResetButton className="ml-auto lg:order-last" />
+          <div className="w-full lg:w-auto">
+            <PickTierSummary />
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <WeaponSelect />
