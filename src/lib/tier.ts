@@ -25,14 +25,19 @@ const SHRINK_GAMES = 10;
 const TIER_CUTOFFS: ReadonlyArray<[ Tier, number ]> = [ [ "S", 0.1 ], [ "A", 0.25 ], [ "B", 0.5 ], [ "C", 0.75 ] ];
 
 // 백분위는 상대 순위라 거의 모든 조합이 1~3판이면 그중에서 S가 나온다.
-// 종합 등급에 한해 판수가 적은 조합은 절대 기준으로 상한을 둔다.
-const LOW_SAMPLE_GAMES = 3;
-const LOW_SAMPLE_TIER_CAP: Tier = "B";
+// 종합 등급에 한해 판수가 적은 조합은 절대 기준으로 상한을 둔다. 판수가 적은 구간부터 적는다.
+// 3판 이하는 최고 B, 4~9판은 최고 A. S는 10판 이상만 받는다.
+const LOW_SAMPLE_CAPS: ReadonlyArray<{ maxGames: number; cap: Tier }> = [
+  { maxGames: 3, cap: "B" },
+  { maxGames: 9, cap: "A" },
+];
 
 const tierIndex = (tier: Tier) => TIERS.indexOf(tier);
 
-const capTier = (tier: Tier, games: number): Tier =>
-  games <= LOW_SAMPLE_GAMES && tierIndex(tier) < tierIndex(LOW_SAMPLE_TIER_CAP) ? LOW_SAMPLE_TIER_CAP : tier;
+const capTier = (tier: Tier, games: number): Tier => {
+  const cap = LOW_SAMPLE_CAPS.find((c) => games <= c.maxGames)?.cap;
+  return cap !== undefined && tierIndex(tier) < tierIndex(cap) ? cap : tier;
+};
 
 // 등급 순서: 등급이 먼저, 같은 등급 안에서는 점수. 상한이 걸린 조합이 점수로 위 등급보다 앞서지 않게 한다.
 export const compareRank = (x: RankedCombo, y: RankedCombo) =>
