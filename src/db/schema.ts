@@ -31,6 +31,15 @@ export const participants = sqliteTable(
     mmrGain: integer("mmr_gain").notNull(), // RP 획득량
     teamKill: integer("team_kill"), // API teamKill. 팀 단위 값이라 같은 팀은 모두 같다. 0003 이전 수집분은 채우기 전까지 null
     damageToPlayer: integer("damage_to_player"), // API damageToPlayer. 본인이 플레이어에게 준 피해량. 0004 이전 수집분은 채우기 전까지 null
+    // 시야 지표 (전적 분석 탭에서만 쓴다). 0005 이전 수집분은 채우기 전까지 null
+    viewContribution: integer("view_contribution"), // API viewContribution. 시야 기여
+    telephotoCameraAdd: integer("telephoto_camera_add"), // API addTelephotoCamera. 망원 카메라 설치
+    telephotoCameraRemove: integer("telephoto_camera_remove"), // API removeTelephotoCamera. 상대 카메라 제거
+    reconDroneUse: integer("recon_drone_use"), // API useReconDrone. 정찰 드론 사용
+    // 개인 킬·어시스트·데스 (전적 분석 소견에서만 쓴다). 0006 이전 수집분은 채우기 전까지 null
+    playerKill: integer("player_kill"), // API playerKill
+    playerAssistant: integer("player_assistant"), // API playerAssistant
+    playerDeaths: integer("player_deaths"), // API playerDeaths. 부활이 있어 판당 여러 번일 수 있다
     preMade: integer("pre_made").notNull(), // API preMade. 의미 확인 전까지 원본 값 보존
   },
   (t) => [

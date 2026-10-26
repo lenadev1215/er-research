@@ -1,4 +1,4 @@
-// 나중에 추가한 열(team_kill: 0003, damage_to_player: 0004)을 기존 수집분에 채운다.
+// 나중에 추가한 열(team_kill: 0003, damage_to_player: 0004, 시야 4열: 0005, KDA 3열: 0006)을 기존 수집분에 채운다.
 // 사용법: pnpm backfill [최대 경기 수=전부]
 // 경기 상세를 다시 조회하므로 수집기와 동시에 돌리지 않는다 (호출량이 두 배가 된다).
 // 아직 비어 있는 경기만 고르므로, 중단 후 다시 실행하면 이어서 채운다.
@@ -10,15 +10,22 @@ sqlite.pragma("journal_mode = WAL");
 
 const limit = Number(process.argv[ 2 ] ?? Infinity);
 const pending = (sqlite.prepare(
-  "SELECT DISTINCT game_id FROM participants WHERE team_kill IS NULL OR damage_to_player IS NULL",
+  `SELECT DISTINCT game_id FROM participants
+   WHERE team_kill IS NULL OR damage_to_player IS NULL OR view_contribution IS NULL
+      OR telephoto_camera_add IS NULL OR telephoto_camera_remove IS NULL OR recon_drone_use IS NULL
+      OR player_kill IS NULL OR player_assistant IS NULL OR player_deaths IS NULL`,
 ).pluck().all() as number[]).slice(0, limit);
 
 // 닉네임을 저장하지 않으므로 참가자는 (경기, 팀, 실험체)로 찾는다. 같은 팀 안에서 실험체는 겹치지 않는다.
 const update = sqlite.prepare(
-  "UPDATE participants SET team_kill = ?, damage_to_player = ? WHERE game_id = ? AND team_number = ? AND character_code = ?",
+  `UPDATE participants
+   SET team_kill = ?, damage_to_player = ?,
+       view_contribution = ?, telephoto_camera_add = ?, telephoto_camera_remove = ?, recon_drone_use = ?,
+       player_kill = ?, player_assistant = ?, player_deaths = ?
+   WHERE game_id = ? AND team_number = ? AND character_code = ?`,
 );
 
-console.log(`TK·딜량이 비어 있는 경기 ${ pending.length }판 (예상 약 ${ Math.ceil(pending.length * 1.1 / 60) }분)`);
+console.log(`TK·딜량·시야·KDA가 비어 있는 경기 ${ pending.length }판 (예상 약 ${ Math.ceil(pending.length * 1.1 / 60) }분)`);
 
 let filled = 0;
 let missing = 0;
@@ -28,7 +35,14 @@ for ( const [ i, gameId ] of pending.entries() ) {
     missing++;
   } else {
     sqlite.transaction(() => {
-      for ( const r of records ) update.run(r.teamKill, r.damageToPlayer, gameId, r.teamNumber, r.characterNum);
+      for ( const r of records ) {
+        update.run(
+          r.teamKill, r.damageToPlayer,
+          r.viewContribution, r.addTelephotoCamera, r.removeTelephotoCamera, r.useReconDrone,
+          r.playerKill, r.playerAssistant, r.playerDeaths,
+          gameId, r.teamNumber, r.characterNum,
+        );
+      }
     })();
     filled++;
   }

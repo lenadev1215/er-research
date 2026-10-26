@@ -33,6 +33,13 @@ export type GameRecord = {
   preMade: number;
   teamKill: number;
   damageToPlayer: number;
+  viewContribution: number;
+  addTelephotoCamera: number;
+  removeTelephotoCamera: number;
+  useReconDrone: number;
+  playerKill: number;
+  playerAssistant: number;
+  playerDeaths: number;
 };
 
 export const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

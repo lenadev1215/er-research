@@ -96,6 +96,13 @@ function saveGame(records: GameRecord[]) {
       mmrGain: r.mmrGain,
       teamKill: r.teamKill,
       damageToPlayer: r.damageToPlayer,
+      viewContribution: r.viewContribution,
+      telephotoCameraAdd: r.addTelephotoCamera,
+      telephotoCameraRemove: r.removeTelephotoCamera,
+      reconDroneUse: r.useReconDrone,
+      playerKill: r.playerKill,
+      playerAssistant: r.playerAssistant,
+      playerDeaths: r.playerDeaths,
       preMade: r.preMade,
     }))).run();
   });
