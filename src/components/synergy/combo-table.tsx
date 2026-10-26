@@ -59,7 +59,7 @@ export function ComboTable({ combos, groupLabel, showTier }: Props) {
         <select
           value={sort.key}
           onChange={(e) => setSortKey(e.target.value as SortKey)}
-          className={`rounded-md border border-line bg-surface px-2 py-1.5 text-ink ${ FOCUS_RING }`}
+          className={`rounded-md border border-line bg-surface pr-8 pl-3 py-1.5 text-ink ${ FOCUS_RING }`}
         >
           {COLUMNS.map((col) => (
             <option key={col.key} value={col.key}>

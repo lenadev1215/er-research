@@ -50,3 +50,15 @@ body {
     animation: none;
   }
 }
+
+/* 드롭다운: 브라우저 기본 화살표는 테두리에 붙어 보여, 안쪽 여백을 둔 화살표로 바꾼다 (색은 --color-muted).
+   오른쪽 여백(pr-8)은 각 select의 클래스에서 준다. */
+@layer base {
+  select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%236b7685' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.625rem center;
+    background-size: 0.75rem;
+  }
+}

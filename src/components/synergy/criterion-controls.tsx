@@ -39,7 +39,7 @@ export function CriterionControls() {
         <select
           value={minGames}
           onChange={(e) => setMinGames(Number(e.target.value))}
-          className="rounded-md border border-line bg-surface px-2 py-1.5 text-ink tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vf"
+          className="rounded-md border border-line bg-surface pr-8 pl-3 py-1.5 text-ink tabular-nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vf"
         >
           {MIN_GAMES_OPTIONS.map((n) => <option key={n} value={n}>{n}판</option>)}
         </select>
