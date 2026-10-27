@@ -26,10 +26,10 @@ const TIER_CUTOFFS: ReadonlyArray<[ Tier, number ]> = [ [ "S", 0.1 ], [ "A", 0.2
 
 // 백분위는 상대 순위라 거의 모든 조합이 1~3판이면 그중에서 S가 나온다.
 // 종합 등급에 한해 판수가 적은 조합은 절대 기준으로 상한을 둔다. 판수가 적은 구간부터 적는다.
-// 3판 이하는 최고 B, 4~9판은 최고 A. S는 10판 이상만 받는다.
+// 3판 이하는 최고 B, 4~19판은 최고 A. S는 20판 이상만 받는다 (데이터가 쌓여 10판에서 올림, 사용자 결정).
 const LOW_SAMPLE_CAPS: ReadonlyArray<{ maxGames: number; cap: Tier }> = [
   { maxGames: 3, cap: "B" },
-  { maxGames: 9, cap: "A" },
+  { maxGames: 19, cap: "A" },
 ];
 
 const tierIndex = (tier: Tier) => TIERS.indexOf(tier);
