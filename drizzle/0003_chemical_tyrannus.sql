@@ -1,0 +1,1 @@
+ALTER TABLE `participants` ADD `team_kill` integer;

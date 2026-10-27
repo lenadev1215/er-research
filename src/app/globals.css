@@ -1,26 +1,87 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/* 실험 결과 판정표: 차가운 연구소 톤 + VF 보라 한 계열. 티어는 VF 농도로 순서를 표현한다. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-paper: #eef1f4;
+  --color-surface: #f8fafb;
+  --color-rail: #e1e6eb;
+  --color-line: #d5dbe2;
+  --color-ink: #1c2430;
+  --color-muted: #6b7685;
+  --color-vf: #4b3fd8;
+  --color-alert: #b4233c;
+  /* 캐리·버스 판 목록의 딜량 배율 (사용자 결정: 캐리 선홍, 버스 파랑). 둘 다 surface 위 대비 4.5:1 이상 */
+  --color-carry: #cc2d63;
+  --color-bus: #2563eb;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --color-tier-s: #4b3fd8;
+  --color-tier-a: #6e66e0;
+  --color-tier-b: #9a96d9;
+  --color-tier-c: #bfc3cf;
+  --color-tier-d: #d6d9e0;
+
+  --font-sans: var(--font-plex-kr);
+  --font-display: var(--font-shoulders);
+
+  --animate-settle: settle 220ms ease-out both;
+  --animate-glitch: glitch 2s ease-in-out infinite;
+
+  @keyframes settle {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* 분석 대기 이모티콘: 0.6초 보인 뒤 살짝 두 번 깜빡이며 흐려져 사라지고, 같은 식으로 돌아온다.
+     끊기는 깜빡임(steps)은 눈이 아파 부드러운 보간으로 바꿨다. 번짐(blur)과 1px 이동으로 지지직거리는 느낌만 남긴다. */
+  @keyframes glitch {
+    0%,
+    30% { opacity: 1; filter: none; transform: none; }
+    /* 사라지기 (0.6s~1.04s) */
+    37% { opacity: 0.55; filter: blur(0.5px); transform: translateX(1px); }
+    41% { opacity: 0.85; filter: none; transform: none; }
+    52% { opacity: 0; filter: blur(2px); transform: translateX(-1px); }
+    /* 비어 있음 (1.04s~1.34s) */
+    67% { opacity: 0; filter: blur(2px); transform: none; }
+    /* 나타나기 (1.34s~1.84s) */
+    76% { opacity: 0.6; filter: blur(1px); transform: translateX(1px); }
+    80% { opacity: 0.35; filter: blur(0.5px); transform: none; }
+    92%,
+    100% { opacity: 1; filter: none; transform: none; }
   }
 }
 
+:root {
+  color-scheme: light;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-plex-kr), system-ui, sans-serif;
+  word-break: keep-all; /* 한국어는 어절 단위로 줄바꿈 */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-settle,
+  .animate-glitch {
+    animation: none;
+  }
+}
+
+/* 드롭다운: 브라우저 기본 화살표는 테두리에 붙어 보여, 안쪽 여백을 둔 화살표로 바꾼다 (색은 --color-muted).
+   오른쪽 여백(pr-8)은 각 select의 클래스에서 준다. */
+@layer base {
+  select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%236b7685' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.625rem center;
+    background-size: 0.75rem;
+  }
 }

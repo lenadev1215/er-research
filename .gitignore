@@ -43,8 +43,17 @@ next-env.d.ts
 
 # sqlite
 /data/*.db*
+/data/*.local.json
+# 배포본 체험 모드 고정 데이터 (친구 기록). 배포본에만 올린다
+/demo-fixtures/
 
 # editor / agent
 /.claude/
 /.vscode/
 CLAUDE.md
+
+# 팬킷 실험체 이미지: 사용 허가 확인 전까지 커밋하지 않음
+/public/characters/*
+!/public/characters/.gitkeep
+# 알렉스 이모티콘(분석 대기 표시)도 git에는 넣지 않고 배포본에만 올린다 (사용자 결정, 2026-10-26)
+/public/emoticon/

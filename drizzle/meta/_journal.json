@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1792935644032,
+      "tag": "0000_natural_dagger",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1792936677231,
+      "tag": "0001_swift_wolverine",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792941150028,
+      "tag": "0002_large_payback",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1792944250058,
+      "tag": "0003_chemical_tyrannus",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1792975770380,
+      "tag": "0004_friendly_lady_vermin",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792987766389,
+      "tag": "0005_slippery_imperial_guard",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792988311908,
+      "tag": "0006_free_doorman",
+      "breakpoints": true
+    }
+  ]
+}
