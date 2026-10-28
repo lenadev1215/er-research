@@ -44,8 +44,6 @@ next-env.d.ts
 # sqlite
 /data/*.db*
 /data/*.local.json
-# 배포본 체험 모드 고정 데이터 (친구 기록). 배포본에만 올린다
-/demo-fixtures/
 
 # editor / agent
 /.claude/

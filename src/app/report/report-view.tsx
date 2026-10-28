@@ -19,7 +19,6 @@ const ERROR_MESSAGE: Record<ReportErrorCode, string> = {
   "rate-limited": "분석 요청이 너무 잦습니다. 몇 분 뒤에 다시 시도하세요.",
   "busy": "지금 다른 분석이 진행 중입니다. 잠시 뒤에 다시 시도하세요.",
   "disabled": "지금은 전적 분석을 쓸 수 없습니다. 데이터를 수집하는 동안에는 꺼 둡니다.",
-  "demo-only": "지금은 체험용으로 등록된 닉네임만 분석할 수 있습니다.",
   "upstream": "전적 서버에서 응답을 받지 못했습니다. 잠시 뒤에 다시 시도하세요.",
   "advice-failed": "소견을 만들지 못했습니다.",
 };

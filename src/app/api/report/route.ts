@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
 import { ErApiBusyError } from "@/lib/er-api/client";
 import { AdviceError, streamAdvice } from "@/lib/report/advice";
@@ -42,8 +41,7 @@ async function* replay(stats: ReportStats, advice: string): AsyncGenerator<Repor
   yield { type: "done" };
 }
 
-// key가 null이면 캐시에 남기지 않는다 (고정 데이터로 만든 소견).
-async function* live(key: string | null, stats: ReportStats, signal: AbortSignal): AsyncGenerator<ReportEvent> {
+async function* live(key: string, stats: ReportStats, signal: AbortSignal): AsyncGenerator<ReportEvent> {
   yield { type: "stats", stats };
   let advice = "";
   try {
@@ -59,33 +57,8 @@ async function* live(key: string | null, stats: ReportStats, signal: AbortSignal
     return;
   }
   // 빈 소견은 캐시하지 않는다 (streamAdvice가 막지만 한 번 더 확인).
-  if ( key && advice.trim() ) writeCache(key, stats, advice);
+  if ( advice.trim() ) writeCache(key, stats, advice);
   yield { type: "done" };
-}
-
-let fixtureTurn = 0;
-
-// 고정 데이터 목록 "닉네임=경로,경로,…". 경로만 적은 항목은 name이 null이다.
-const parseFixtures = (value: string | undefined) => ( value ?? "" ).split(",").map((e) => e.trim()).filter(Boolean).map((e) => {
-  const at = e.lastIndexOf("=");
-  return at < 0 ? { name: null, path: e } : { name: e.slice(0, at).trim(), path: e.slice(at + 1).trim() };
-});
-
-// 프롬프트 시험용 고정 데이터. "닉네임=경로"는 그 닉네임으로 검색할 때, 경로만 적은 항목과 등록되지 않은 닉네임은 차례로 돌린다.
-// 닉네임은 .env.local(git 제외)에만 적는다. 개발 환경에서만 읽는다.
-function pickFixture(nickname: string): string | null {
-  if ( process.env.NODE_ENV !== "development" ) return null;
-  const entries = parseFixtures(process.env.REPORT_DEV_FIXTURE);
-  if ( entries.length === 0 ) return null;
-  return entries.find((e) => e.name === nickname)?.path ?? entries[ fixtureTurn++ % entries.length ].path;
-}
-
-// 배포본 체험 모드: 등록된 닉네임만 고정 데이터(demo-fixtures/, git 제외)로 소견을 만든다. ER API를 부르지 않아 수집 중에도 켤 수 있다.
-// 닉네임 매핑은 배포 명령의 환경 변수(REPORT_DEMO_FIXTURE)로만 넘긴다. 켜져 있지 않으면 undefined.
-function pickDemo(nickname: string): { path: string | null } | undefined {
-  const entries = parseFixtures(process.env.REPORT_DEMO_FIXTURE).filter((e) => e.name !== null);
-  if ( entries.length === 0 ) return undefined;
-  return { path: entries.find((e) => e.name === nickname)?.path ?? null };
 }
 
 export async function POST(request: Request) {
@@ -93,40 +66,6 @@ export async function POST(request: Request) {
   const nickname = typeof body === "object" && body !== null && "nickname" in body && typeof body.nickname === "string"
     ? body.nickname.trim()
     : "";
-
-  // 프롬프트 시험용: 저장해 둔 통계로 소견만 만든다. ER API를 부르지 않아 수집기와 함께 돌릴 수 있다.
-  // 파일은 data/*.local.json (git 제외).
-  const fixture = pickFixture(nickname);
-  if ( fixture ) {
-    try {
-      const stats = JSON.parse(await readFile(fixture, "utf8")) as ReportStats;
-      return ndjson(live(null, stats, request.signal));
-    } catch (error) {
-      // 개발 환경 전용 분기라 원인을 그대로 돌려준다 (파일 경로·JSON 형식 확인용).
-      return NextResponse.json({ code: "upstream", detail: String(error) }, { status: 500 });
-    }
-  }
-
-  const demo = pickDemo(nickname);
-  if ( demo ) {
-    if ( nickname.length === 0 || nickname.length > NICKNAME_MAX ) return fail("invalid", 400);
-    if ( !demo.path ) return fail("demo-only", 404);
-    // 공개 주소라 Claude 호출을 막는 캐시와 IP 제한은 실제 조회와 같이 건다.
-    const key = nicknameKey(nickname);
-    const cached = readCache(key);
-    if ( cached ) return ndjson(replay(cached.stats, cached.advice));
-    const retryAfter = takeRateLimit(clientIp(request.headers));
-    if ( retryAfter > 0 ) return fail("rate-limited", 429, { "Retry-After": String(retryAfter) });
-    try {
-      const stats = JSON.parse(await readFile(demo.path, "utf8")) as ReportStats;
-      return ndjson(live(key, stats, request.signal));
-    } catch (error) {
-      // 경로에는 닉네임이 없다 (demo-fixtures/N.json). 원인 확인용으로 오류 코드만 남긴다.
-      const code = error instanceof Error && "code" in error ? String(error.code) : "";
-      console.warn(`[report] 체험 데이터 읽기 실패: ${ error instanceof Error ? error.name : "unknown" } ${ code }`);
-      return fail("upstream", 500);
-    }
-  }
 
   // 키가 하나라 로컬 수집기를 돌리는 동안에는 배포본에서도 꺼 둔다.
   if ( process.env.REPORT_DISABLED === "1" ) return fail("disabled", 503);

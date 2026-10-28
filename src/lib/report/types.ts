@@ -154,7 +154,7 @@ export type ReportStats = {
 };
 
 // 스트림 시작 전에 끝나는 오류는 HTTP 상태와 { code }로, 스트림 도중의 오류는 error 이벤트로 온다.
-export type ReportErrorCode = "invalid" | "not-found" | "no-games" | "rate-limited" | "busy" | "disabled" | "demo-only" | "upstream" | "advice-failed";
+export type ReportErrorCode = "invalid" | "not-found" | "no-games" | "rate-limited" | "busy" | "disabled" | "upstream" | "advice-failed";
 
 export type ReportEvent =
   | { type: "stats"; stats: ReportStats }
